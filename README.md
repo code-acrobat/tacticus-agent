@@ -1001,6 +1001,61 @@ tacticus -- python3 /home/user/workspace/tacticus/tacticus_mcp.py`; check with
 result already arrives **parsed** — read `.rows` / `.ratio` directly instead of
 hunting for an MCP content wrapper.
 
+## Web deployment (GitHub Pages + Cloudflare Worker)
+
+The same reports run as a static site: **https://code-acrobat.github.io/tacticus-agent/**
+
+```
+browser ──POST /player──▶ Worker ──X-API-KEY──▶ api.tacticusgame.com
+   │  next_step runs in-tab (Pyodide + bundle.tar.gz)
+   └──POST /chat────────▶ Worker ──Bearer──────▶ Groq (openai/gpt-oss-20b)
+```
+
+| Piece | Role |
+|---|---|
+| **GitHub Pages** | Serves `web/index.html` + `browser_harness.py` + `bundle.tar.gz`. Static build only — there is no app server. |
+| **Pyodide** (CDN, pinned v0.26.2) | Runs the real Python CLIs **in the visitor's tab**; the `next_step` brief is computed locally, never on a server. |
+| **Cloudflare Worker** (`worker/worker.js`) | Two routes: `/player` = key pass-through to the game API, `/chat` = LLM relay over the precomputed brief. In-memory 30 req/min/IP, CORS for any origin. |
+| **Groq** | The chat model — OpenAI-compatible, so the Worker needs no code to swap providers. |
+
+**Key custody.** The API key lives in `sessionStorage`, travels through the
+Worker **once** to the game API, and is never stored nor sent to the LLM. Chat
+sees only the brief (hero names, gates, energy numbers) — and the page says so
+in plain text above the form, with a link back to this repository.
+
+**Worker secrets.** Three `wrangler secret put`s, no code change:
+
+```bash
+cd worker
+printf '%s' 'https://api.groq.com/openai/v1' | npx wrangler secret put LLM_BASE_URL
+printf '%s' 'gsk_...'                        | npx wrangler secret put LLM_KEY
+printf '%s' 'openai/gpt-oss-20b'             | npx wrangler secret put LLM_MODEL
+```
+
+Secrets apply immediately — no redeploy. The worker URL is
+`https://<worker-name>.<account-subdomain>.workers.dev` (here both are
+`tacticus-agent`, which is why it looks doubled); it is **committed** as the
+`WORKER` const in `web/index.html`, so update it in the same change that renames
+the worker.
+
+**Deploy.** Push to `main` → `pages.yml` re-fetches the gitignored `research/`
+(planner pinned by `PLANNER_SHA`, gameconfig pinned by commit), runs
+`make_bundle.py`, publishes the three files. One-time repo setting:
+**Settings → Pages → Source: GitHub Actions**.
+
+**Two traps worth knowing:**
+
+- Re-running an *old* workflow run redeploys *that run's* artifact, so the site
+  goes backwards in time. If it looks stale, push a new commit (an empty one
+  works) — never rerun history.
+- Changing Pages settings (or adding a custom domain) resets Source to "deploy
+  from a branch" → Jekyll renders `README.md` instead and `bundle.tar.gz` 404s.
+  Set it back to **GitHub Actions**.
+
+**Run it yourself:** clone, `python3 make_bundle.py`, serve `web/index.html`
+next to `browser_harness.py` + `dist/bundle.tar.gz`, `cd worker && npx wrangler
+deploy`, then put your own three secrets.
+
 ## API key
 
 Stored in `.tacticus_api_key` (no trailing newline). Use it directly:
