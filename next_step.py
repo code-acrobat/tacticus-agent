@@ -369,9 +369,12 @@ def render(asm, top):
         print(f"  {g['gate']:<9} {g['count']:<3} {g['note']}{flag}")
         shown = [b for b in asm["blocked"]
                  if any(t["gate"] == g["gate"] for t in b["gates"])][:5]
+        # width from the longest name in THIS block, so nothing runs together
+        nw = max((len(b["name"]) for b in shown), default=0)
+        rw = max((len(b["rank"]) for b in shown), default=0)
         for b in shown:
             detail = next(t["detail"] for t in b["gates"] if t["gate"] == g["gate"])
-            print(f"             {b['name']:<16}{b['rank']:<14}{detail}")
+            print(f"             {b['name']:<{nw}}  {b['rank']:<{rw}}  {detail}")
         rest = g["count"] - len(shown)
         if rest > 0:
             print(f"             ... +{rest} more")
@@ -406,17 +409,19 @@ def render(asm, top):
     if asm["farm"]:
         print(f"  {idx}) FARM - {len(asm['farm'])} actionable rungs ranked by "
               f"power per energy (top {min(top, len(asm['farm']))})")
-        print(f"     {'hero':<16}{'next rung':<16}{'energy':>7}{'+power':>9}"
+        rows = asm["farm"][:top]
+        nw = max(len(r["name"]) for r in rows)
+        print(f"     {'hero':<{nw}}  {'next rung':<16}{'energy':>7}{'+power':>9}"
               f"{'pow/E':>7}{'days':>6}")
-        for r in asm["farm"][:top]:
+        for r in rows:
             pe = "free" if r["pow_per_energy"] is None else f"{r['pow_per_energy']:.1f}"
             mark = ""
             if r.get("contested"):
                 mark = "  ! " + ", ".join(r["contested"][:2]) \
                     + ("..." if len(r["contested"]) > 2 else "")
-            print(f"     {r['name']:<16}{r['next']:<16}{r['energy']:>7,.0f}"
+            print(f"     {r['name']:<{nw}}  {r['next']:<16}{r['energy']:>7,.0f}"
                   f"{r['d_power']:>9,}{pe:>7}{r['days']:>6}{mark}")
-        if any(r.get("contested") for r in asm["farm"][:top]):
+        if any(r.get("contested") for r in rows):
             print("     ! = spends bank stock other next rungs also claim - "
                   "the first promoted takes it, the rest must craft")
         idx += 1
