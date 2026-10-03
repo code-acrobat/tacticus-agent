@@ -20,3 +20,7 @@ research/
 
 # Browser bundle build output
 /dist/
+
+# wrangler local state
+.wrangler/
+worker/.wrangler/
