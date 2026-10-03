@@ -1,8 +1,34 @@
-# Tacticus API — Swagger UI
+# tacticus-agent
 
-Interactive Swagger UI for the [Tacticus](https://tacticusgame.com) game API
-(`https://api.tacticusgame.com/api-docs`), plus a small local proxy so the
-browser can actually talk to it.
+**Live site → <https://code-acrobat.github.io/tacticus-agent/>**
+
+Paste your official Tacticus API key and get a decision brief computed in your
+browser: which heroes are blocked and by what (XP / badges / gear / items / a
+missing team), a farm order ranked by **power per energy**, the shared-pool
+purchases worth making, and the live event window — plus a chat that answers
+from that same brief.
+
+Everything runs client-side (Pyodide executes this repo's own Python CLIs in
+the tab); your key only transits the Cloudflare Worker to the game API —
+**never stored, never sent to the LLM**. Unofficial fan project over the
+read-only API.
+
+## Try it
+
+1. Generate a key at <https://api.tacticusgame.com/> (Player scope).
+2. Open the site, paste it, press **Load account** — the first visit fetches
+   Pyodide from the CDN, so give it a few seconds.
+3. Read the brief, press **Hunt nodes ⚔** for the mechanical-hunt rankings,
+   and ask the chat about the brief. Theme toggle top-right; the key lives in
+   `sessionStorage` only.
+
+## Local Swagger UI
+
+The rest of this repo is the interactive Swagger UI for the
+[Tacticus](https://tacticusgame.com) game API
+(`https://api.tacticusgame.com/api-docs`) plus a small local proxy so the
+browser can actually talk to it — and the CLI tools that back the site, the
+brief and the MCP server.
 
 **Open: <http://127.0.0.1:8124/>**
 
