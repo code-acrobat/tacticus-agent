@@ -12,6 +12,10 @@ __pycache__/
 *.swp
 .DS_Store
 
+# Scratch dir — omac blocks bare /tmp without prompts, so workspace-local .tmp
+# (kept out of git; use it for throwaway files instead of /tmp)
+.tmp/
+
 # Local player snapshot — roster data stays local
 tacticus-player.json
 
