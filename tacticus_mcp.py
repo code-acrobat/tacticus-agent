@@ -32,7 +32,7 @@ import sys
 
 BASE = pathlib.Path(__file__).resolve().parent
 SERVER_NAME = "tacticus"
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 PROTOCOL_FALLBACK = "2024-11-05"   # classic initialize handshake
 RUN_TIMEOUT = 120                  # seconds; the report itself runs in ~0.05 s
 
@@ -250,12 +250,46 @@ TOOLS = [
         },
     },
     {
+        "name": "machine_hunt",
+        "title": "Machine-hunt event farming",
+        "description": (
+            "Where do Mechanical enemies die cheapest? Campaign nodes "
+            "ranked by event points per energy (3 pts Standard/Mirror, 5 "
+            "Elite), your attempt count per node (exhausted hidden unless "
+            "all=true), and the live/upcoming event window. items=true also "
+            "flags nodes that drop items your next rank-ups need, with a "
+            "footer totalling the need per item and per top hero. campaign "
+            "filters by substring of the campaign id ('indomitus'). Returns "
+            "{schema_version, event_ends, events, rows:[...]} - rows carry "
+            "pt_per_e, pts, att, want, need. next_step convenes this as its "
+            "advisory 'event' witness (schedule awareness only)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "campaign": {"type": "string",
+                             "description": "substring of the campaign id "
+                                            "(e.g. 'indomitus')"},
+                "top": {"type": "integer", "minimum": 1,
+                        "description": "rows to show (default 15)"},
+                "all": {"type": "boolean",
+                        "description": "also show nodes whose attempts are "
+                                       "exhausted"},
+                "items": {"type": "boolean",
+                          "description": "flag nodes dropping items the next "
+                                         "rank-ups need (+ footer totals)"},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "next_step",
         "title": "Assembler: where am I blocked, what next",
         "description": (
-            "The assembler: convenes six witnesses fresh (rank_up_report "
+            "The assembler: convenes seven witnesses fresh (rank_up_report "
             "--energy, xp_gate, ability_gate, power_delta, gear_report, "
-            "team_roster) into one brief - WHERE I'M BLOCKED (per-gate "
+            "team_roster, machine_hunt as the advisory event witness) into "
+            "one brief - WHERE I'M BLOCKED (per-gate "
             "counts with hero examples) and WHAT TO DO NEXT in leverage "
             "order (shared-pool badge purchases -> apply books in stock -> "
             "farm by power-per-energy -> gear buys -> unlocks) plus a NEXT "
@@ -333,10 +367,11 @@ INSTRUCTIONS = (
     "alliance, so a block is roster-wide). power_delta gives the power "
     "gained by the next rank-up as a planner-proxy, not the in-game score. "
     "next_step is the ASSEMBLER: one brief answering where you are blocked "
-    "and what to do next (six witnesses, one run, ~1.1 s) - start there "
+    "and what to do next (seven witnesses, one run, ~1.1 s) - start there "
     "when the question spans gates. team_roster checks the curated "
     "guild-raid comps (fieldability only, no synergy score exists in "
-    "config)."
+    "config). machine_hunt ranks campaign nodes by event points per energy "
+    "with your attempt counts - the 'where do I hunt next?' answer."
 )
 
 
@@ -400,6 +435,17 @@ def build_argv(name, args):
         if args.get("query"):
             argv.append(str(args["query"]))
         argv.append("--json")
+        return argv
+    if name == "machine_hunt":
+        argv = [sys.executable, str(BASE / "machine_hunt.py"), "--json"]
+        if args.get("campaign"):
+            argv.append(str(args["campaign"]))
+        if args.get("items"):
+            argv.append("--items")
+        if args.get("all"):
+            argv.append("--all")
+        if args.get("top"):
+            argv += ["--top", str(int(args["top"]))]
         return argv
     if name == "next_step":
         argv = [sys.executable, str(BASE / "next_step.py")]
