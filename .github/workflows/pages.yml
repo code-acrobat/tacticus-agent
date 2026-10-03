@@ -1,6 +1,9 @@
 # Browser build: re-fetch gitignored research/ (pinned), make_bundle, deploy
 # web/index.html + bundle + browser_harness.py to GitHub Pages.
 # One-time repo setup: Settings -> Pages -> Source: "GitHub Actions".
+# Actions are SHA-pinned (release tag kept in the comment). Update one with:
+#   gh api repos/actions/checkout/commits/v4.4.0 --jq .sha
+# (the commits endpoint - the tag endpoint returns the annotated tag object).
 name: pages
 on:
   push:
@@ -10,14 +13,32 @@ permissions:
   contents: read
   pages: write
   id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
 env:
   # bump on every research sync (AGENTS.md "External data sync")
   PLANNER_SHA: 15fd7eb50f7eb6e8af9a51f6054d62ecf07d43f1
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Byte-compile every CLI
+        run: python3 -m py_compile *.py
+      - name: MCP adapter smoke (initialize handshake)
+        run: |
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
+            | python3 tacticus_mcp.py > /dev/null
+      - name: Page + worker static checks
+        run: python3 check_page.py
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Fetch planner data (pinned)
         run: |
           mkdir -p research/tacticus-planner-api
@@ -35,15 +56,16 @@ jobs:
         run: |
           mkdir site
           cp web/index.html browser_harness.py dist/bundle.tar.gz site/
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
           path: site
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
