@@ -1,6 +1,6 @@
 # Secrets — never commit
 .tacticus_api_key
-
+.env
 # Generated page; embeds the API key above (regenerate with gen_swagger.py)
 swagger-ui.html
 
