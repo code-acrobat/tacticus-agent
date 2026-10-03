@@ -135,7 +135,7 @@ function tableHTML(rows) {
   const body = rows.slice(1).map(cells);
   return '<table id="dt' + (++tid) + '"><thead><tr>' + head.map(h => '<th>' + inline(h) + '</th>').join('') +
     '</tr></thead><tbody>' + body.map(r =>
-      head.map((_, i) => '<td>' + inline(r[i] || '') + '</td>').join('')).join('') +
+      '<tr>' + head.map((_, i) => '<td>' + inline(r[i] || '') + '</td>').join('') + '</tr>').join('') +
     '</tbody></table>';
 }
 
