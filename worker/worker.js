@@ -56,7 +56,10 @@ export default {
         'concise and actionable. Never ask for or repeat API keys. Where things ' +
         "live in it: WHERE I'M BLOCKED = gates per hero; item 3) FARM = energy, " +
         '+power and pow/E per rung (power bought by the next rank-up), which is ' +
-        'also echoed in the NEXT: chain.\n\n' +
+        'also echoed in the NEXT: chain. Lines like "python3 ..." are terminal ' +
+        'hints for the CLI, never instructions for the user: on this page those ' +
+        'tools have already run, and machine_hunt --items is available from the ' +
+        'page "Hunt nodes" button, so point there instead of a shell.\n\n' +
         '--- BRIEF ---\n' + String(brief).slice(0, 40000);
       const r = await fetch(
         (env.LLM_BASE_URL || 'https://api.openai.com/v1') + '/chat/completions',
