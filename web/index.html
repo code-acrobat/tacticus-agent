@@ -18,6 +18,8 @@
   h1 small { color: rgba(127,127,127,.75); font-weight: normal; }
   button:disabled { opacity: .5; cursor: default; }
   #status { margin: .6rem 0; min-height: 1.4em; color: var(--links, #8ab4f8); }
+  #huntrow { display: flex; gap: .6rem; align-items: center; margin: .5rem 0; flex-wrap: wrap; }
+  #huntout { margin: .5rem 0; }
   #brief { white-space: pre-wrap; overflow-x: auto; padding: 1rem; border-radius: .5rem;
            border: 1px solid rgba(127,127,127,.35); background: rgba(127,127,127,.08);
            font: 13px/1.45 ui-monospace, monospace; }
@@ -57,6 +59,11 @@ the <a href="https://github.com/code-acrobat/tacticus-agent" rel="noopener">sour
 </div>
 <div id="status"></div>
 <pre id="brief" hidden></pre>
+<div id="huntrow">
+  <button id="hunt" type="button" disabled>Hunt nodes ⚔</button>
+  <span class="note">runs <code>machine_hunt --items</code> in your browser — Mechanical nodes ranked by event points per energy</span>
+</div>
+<pre id="huntout" hidden></pre>
 <div id="tools">
   <p class="note"><strong>What this page ships</strong> — everything below is computed in
   your browser from your snapshot by <code>next_step</code> (seven witnesses); the chat
@@ -102,6 +109,24 @@ $('theme').addEventListener('click', () => {
   theme = theme === 'dark' ? 'light' : 'dark';
   localStorage.setItem('tacticusTheme', theme);
   applyTheme();
+});
+
+/* machine_hunt --items runs in the same Pyodide runtime as the brief, so the
+   python3 hint in the EVENTS block is runnable right here */
+let huntOn = false;
+$('hunt').addEventListener('click', async () => {
+  if (huntOn) { $('huntout').hidden = true; $('hunt').textContent = 'Hunt nodes ⚔'; huntOn = false; return; }
+  if (busy || !booted) return;
+  busy = true; $('hunt').disabled = true;
+  try {
+    status('ranking hunt nodes (machine_hunt --items)…');
+    $('huntout').textContent = await py.runPythonAsync('str(_h.run_cli("/tacticus/machine_hunt.py", ["--items"]).stdout)');
+    $('huntout').hidden = false;
+    $('hunt').textContent = 'Hide hunt nodes';
+    huntOn = true;
+    status('ready');
+  } catch (e) { say(e); }
+  finally { busy = false; $('hunt').disabled = false; }
 });
 
 function guard() {
@@ -161,6 +186,7 @@ async function loadAccount() {
     $('brief').hidden = false;
     $('chat').hidden = false;
     $('ask').disabled = false;
+    $('hunt').disabled = false;
     status('ready — brief computed locally; ask away below');
   } catch (e) { say(e); }
   finally { busy = false; $('load').disabled = false; }
