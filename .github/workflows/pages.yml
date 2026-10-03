@@ -1,0 +1,49 @@
+# Browser build: re-fetch gitignored research/ (pinned), make_bundle, deploy
+# web/index.html + bundle + browser_harness.py to GitHub Pages.
+# One-time repo setup: Settings -> Pages -> Source: "GitHub Actions".
+name: pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+env:
+  # bump on every research sync (AGENTS.md "External data sync")
+  PLANNER_SHA: 15fd7eb50f7eb6e8af9a51f6054d62ecf07d43f1
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch planner data (pinned)
+        run: |
+          mkdir -p research/tacticus-planner-api
+          git -C research/tacticus-planner-api init -q
+          git -C research/tacticus-planner-api fetch -q --depth 1 \
+            https://github.com/TacticusPlanner/tacticus-planner-api "$PLANNER_SHA"
+          git -C research/tacticus-planner-api checkout -q FETCH_HEAD
+      - name: Fetch game config (pinned file)
+        run: |
+          mkdir -p research/datamine
+          curl -fsSL -o research/datamine/gameconfig142.json \
+            https://raw.githubusercontent.com/unrstuart/datamine_tacticus/73b9a64/gameconfig.1.42.json
+      - run: python3 make_bundle.py
+      - name: Assemble site
+        run: |
+          mkdir site
+          cp web/index.html browser_harness.py dist/bundle.tar.gz site/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

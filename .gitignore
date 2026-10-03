@@ -17,3 +17,6 @@ tacticus-player.json
 
 # Research artifacts — third-party clones/data, local reference only
 research/
+
+# Browser bundle build output
+/dist/

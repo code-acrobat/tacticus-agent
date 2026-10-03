@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tacticus-agent</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 60rem; margin: 2rem auto; padding: 0 1rem; background: #111; color: #ddd; }
+  h1 { font-size: 1.3rem; } h1 small { color: #888; font-weight: normal; }
+  input, button { font: inherit; padding: .45rem .7rem; border-radius: .4rem; border: 1px solid #444; background: #1b1b1b; color: #eee; }
+  button { cursor: pointer; background: #2b6; border-color: #2b6; color: #041; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  #status { margin: .6rem 0; color: #9ad; min-height: 1.4em; }
+  #brief { white-space: pre-wrap; background: #0c0c0c; border: 1px solid #333; border-radius: .5rem; padding: 1rem; overflow-x: auto; font: 13px/1.45 ui-monospace, monospace; }
+  #chat { margin-top: 1.5rem; }
+  .msg { padding: .5rem .8rem; margin: .4rem 0; border-radius: .6rem; max-width: 92%; white-space: pre-wrap; }
+  .you { background: #1d3a5f; margin-left: auto; }
+  .bot { background: #1e1e1e; border: 1px solid #333; }
+  #row { display: flex; gap: .5rem; margin-top: .6rem; }
+  #q { flex: 1; }
+  .note { color: #777; font-size: .85rem; }
+</style>
+</head>
+<body>
+<h1>tacticus-agent <small>— decision cockpit, computed in your browser</small></h1>
+<p class="note">Your API key goes only through the proxy to the game API — never stored, never sent to the
+LLM. Reports run locally via Pyodide; only the chat relay leaves this page.</p>
+<div id="row">
+  <input id="key" type="password" placeholder="Tacticus API key (X-API-KEY)" autocomplete="off">
+  <button id="load">Load account</button>
+</div>
+<div id="status"></div>
+<pre id="brief" hidden></pre>
+<div id="chat" hidden>
+  <div id="msgs"></div>
+  <div id="row">
+    <input id="q" placeholder="Ask about your account…">
+    <button id="ask" disabled>Ask</button>
+  </div>
+</div>
+<script>
+/* Patch after `wrangler deploy` — the workers.dev URL it prints. */
+const WORKER = 'https://REPLACE-ME.workers.dev';
+const CDN = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/';
+let py = null, booted = false, brief = '', busy = false;
+
+const $ = id => document.getElementById(id);
+const status = t => { $('status').textContent = t; };
+const say = e => { status('⚠ ' + (e && e.message || e)); };
+
+function guard() {
+  if (!WORKER.includes('REPLACE-ME')) return true;
+  status('set WORKER in index.html (deploy the Cloudflare worker first)');
+  return false;
+}
+
+async function initPy() {
+  status('loading python runtime (~10 MB, cached after first visit)…');
+  const s = document.createElement('script');
+  s.src = CDN + 'pyodide.js';
+  document.head.appendChild(s);
+  await new Promise((res, rej) => { s.onload = res; s.onerror = () => rej(new Error('pyodide.js failed to load')); });
+  py = await loadPyodide({ indexURL: CDN });
+  status('loading harness…');
+  const src = await (await fetch('browser_harness.py')).text();
+  py.globals.set('hsrc', src);
+  await py.runPythonAsync(`
+import types, sys
+_h = types.ModuleType('browser_harness'); _h.__file__ = 'browser_harness.py'
+exec(compile(hsrc, 'browser_harness.py', 'exec'), _h.__dict__)
+sys.modules['browser_harness'] = _h
+`);
+}
+
+async function loadAccount() {
+  if (!guard() || busy) return;
+  const key = $('key').value.trim() || sessionStorage.getItem('tacticusKey') || '';
+  if (!key) { status('paste your API key first'); return; }
+  sessionStorage.setItem('tacticusKey', key);
+  busy = true; $('load').disabled = true;
+  try {
+    status('fetching player via proxy…');
+    const r = await fetch(WORKER + '/player', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ apiKey: key }),
+    });
+    if (!r.ok) throw new Error('proxy HTTP ' + r.status + (r.status === 403 ? ' (bad/expired key?)' : ''));
+    const playerText = await r.text();
+    JSON.parse(playerText);
+    if (!py) await initPy();
+    py.globals.set('player_json', playerText);
+    if (!booted) {
+      status('fetching report bundle (1.4 MB)…');
+      py.globals.set('bundle_bytes', new Uint8Array(await (await fetch('bundle.tar.gz')).arrayBuffer()));
+      status('unpacking…');
+      await py.runPythonAsync("_h.bootstrap(bytes(bundle_bytes), player_json, '/tacticus'); _h.install()");
+      booted = true;
+    } else {
+      await py.runPythonAsync("open('/tacticus/tacticus-player.json', 'w').write(player_json)");
+    }
+    status('computing brief (next_step)…');
+    brief = await py.runPythonAsync('str(_h.run_cli("/tacticus/next_step.py", ["--top", "10"]).stdout)');
+    $('brief').textContent = brief;
+    $('brief').hidden = false;
+    $('chat').hidden = false;
+    $('ask').disabled = false;
+    status('ready — brief computed locally; ask away below');
+  } catch (e) { say(e); }
+  finally { busy = false; $('load').disabled = false; }
+}
+
+function bubble(who, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + who;
+  d.textContent = text;
+  $('msgs').appendChild(d);
+  d.scrollIntoView({ block: 'nearest' });
+}
+
+async function ask() {
+  const q = $('q').value.trim();
+  if (!q || busy || !brief) return;
+  busy = true; $('ask').disabled = true;
+  $('q').value = '';
+  bubble('you', q);
+  try {
+    status('thinking…');
+    const r = await fetch(WORKER + '/chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ brief, messages: JSON.parse(sessionStorage.getItem('msgs') || '[]').concat({ role: 'user', content: q }) }),
+    });
+    if (!r.ok) throw new Error('chat HTTP ' + r.status);
+    const reply = await r.text();
+    bubble('bot', reply);
+    const hist = JSON.parse(sessionStorage.getItem('msgs') || '[]')
+      .concat({ role: 'user', content: q }, { role: 'assistant', content: reply }).slice(-40);
+    sessionStorage.setItem('msgs', JSON.stringify(hist));
+    status('ready');
+  } catch (e) { say(e); }
+  finally { busy = false; $('ask').disabled = false; $('q').focus(); }
+}
+
+$('load').addEventListener('click', loadAccount);
+$('ask').addEventListener('click', ask);
+$('q').addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
+$('key').addEventListener('keydown', e => { if (e.key === 'Enter') loadAccount(); });
+$('key').value = sessionStorage.getItem('tacticusKey') || '';
+</script>
+</body>
+</html>

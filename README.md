@@ -74,6 +74,11 @@ matching its own command line.
 | `research/` | **Git-ignored, ~74 MB** — offline copies of the third-party sources used for game-mechanics research (planner repos, raw game config, wiki scrapes). See `research/README.md` |
 | `tacticus-shop-prices.json` | Daily Deals / shop prices (energy refill ladder, per-rarity singles, chests, requisition + EV, coins, `typical_single_bs` ladder behind the `SHOP` column, `blackstone_income` = subscription + promo-code estimates) with `fair_price_floor_bs` markup vs farming. For the buy-vs-farm angle. |
 | `tacticus_mcp.py` | Thin MCP adapter (stdio, stdlib only) exposing `rank_up_report`, `item_value`, `xp_gate`, `gear_report`, `ability_gate`, `power_delta`, `team_roster`, `next_step`, `player_refresh` as agent tools + the two config files as resources. Marshalling only — runs the CLIs and returns their `--json` verbatim. Registered in `opencode.json`. |
+| `make_bundle.py` | Packs the browser bundle (`dist/bundle.tar.gz`, gitignored): code + configs + planner data, **no roster/key**. |
+| `browser_harness.py` | Pyodide runner: extracts the bundle, shims the two `subprocess` call sites in-process. Self-check: `python3 browser_harness.py` (byte-equal vs real subprocess). |
+| `web/index.html` | Browser front end: Pyodide in-tab, brief via `next_step`, chat via the Worker proxy. Key stays in the tab (sessionStorage) and only transits the proxy to the game API. |
+| `worker/worker.js` | Cloudflare Worker: `/player` CORS pass-through (key never stored), `/chat` LLM relay over the precomputed brief. |
+| `.github/workflows/pages.yml` | Deploys the site to GitHub Pages (re-fetches gitignored `research/`, pinned). |
 | `.tacticus_api_key` | API key (`chmod 600`), read by `gen_swagger.py` |
 
 ## Regenerating the UI
