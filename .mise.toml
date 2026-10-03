@@ -1,0 +1,5 @@
+# Tool versions (mise); needs ~/.local/share/mise/shims on PATH.
+# First run: mise install     Upgrade: mise upgrade
+[tools]
+node = "24"
+"npm:@fission-ai/openspec" = "1.13.2"

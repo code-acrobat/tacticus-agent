@@ -1,0 +1,13 @@
+{
+  "mcp": {
+    "servers": {
+      "tacticus": {
+        "type": "local",
+        "command": [
+          "python3",
+          "/home/user/workspace/tacticus/tacticus_mcp.py"
+        ]
+      }
+    }
+  }
+}

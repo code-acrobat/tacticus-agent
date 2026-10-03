@@ -1,0 +1,147 @@
+{
+  "source": "Tacticus community wiki - HDTW DropRate (base drop rates as shown in game)",
+  "capturedBy": "user-supplied",
+  "schema_version": 1,
+  "description": "Base probability that a campaign battle drops the reward item, by campaign tier and item rarity. Mercy/pity modifies these upward on consecutive failures - see 'mercy'.",
+
+  "rate_aliases": {
+    "EliteMirror": "Elite",
+    "note": "EliteMirror shares Elite's drop rates (wiki: 'Elite Mirror Campaigns use the Elite drop rates'). Same 10 energy cost - it is a separate node list, not a separate rate tier, so it needs no row in 'tiers'."
+  },
+
+  "rank_item_rarity": {
+    "note": "ASSUMED, NOT from the API. The player JSON exposes only how many grid cells are filled, never which items, so the rarity of the items still needed is inferred from the rank being attempted. Tune these values freely, or force one rarity per run with rank_up_report.py --item-rarity.",
+    "Stone": "Common",
+    "Iron": "Common",
+    "Bronze": "Uncommon",
+    "Silver": "Rare",
+    "Gold": "Epic",
+    "Diamond": "Legendary",
+    "Adamantine": "Legendary"
+  },
+
+  "tiers": {
+    "Normal":    { "Common": 0.75,    "Uncommon": 0.5714, "Rare": 0.2,     "Epic": 0.1429, "Legendary": 0.0833 },
+    "Mirror":    { "Common": 0.8333,  "Uncommon": 0.7,    "Rare": 0.3333,  "Epic": 0.2,    "Legendary": 0.0909 },
+    "Extremis":  { "Common": 0.9375,  "Uncommon": 0.75,   "Rare": 0.6667,  "Epic": 0.3333, "Legendary": 0.1429 },
+    "Elite":     { "Common": 1.0,     "Uncommon": 1.0,    "Rare": 1.0,     "Epic": 0.6667, "Legendary": 0.3333 }
+  },
+
+  "elite_overflow": {
+    "note": "Elite battles guarantee the first drop for Common/Uncommon/Rare/Shards, then roll a SECOND time for an 'overflow' - a small chance of getting 2 items in one fight. Rates below are that overflow roll. Treat Elite as '100% + X%' = guaranteed item plus an independent bonus roll, never a single >100% probability. Epic and Legendary have NO guaranteed drop on Elite and therefore no overflow roll.",
+    "user_confirmed": true,
+    "Common": 0.5,
+    "Uncommon": 0.25,
+    "Rare": 0.0833,
+    "Legendary": null,
+    "Epic": null
+  },
+
+  "shards": {
+    "Normal": 0.3,
+    "Mirror": 0.3,
+    "Extremis": 0.6154,
+    "Elite": { "base": 1.0, "second_roll": 0.0417 }
+  },
+
+  "mercy": {
+    "status": "FOUND - from the raw game config (research/datamine/gameconfig142.json)",
+    "parameters": {
+      "campaignMercyWeightAdjustment": { "success": 0, "fail": -1, "threshold": 1 }
+    },
+    "formula": [
+      "chance = numerator / (denominator - fails)",
+      "each failure subtracts 1 from the denominator (fail: -1), i.e. the chance rises",
+      "on a drop the counter resets to 0 (success: 0)",
+      "threshold: 1 = the denominator never drops below 1, so chance hits 100% once denominator - fails <= numerator",
+      "counter is scoped per drop table / node and resets on success"
+    ],
+    "worked_example": "Elite Legendary = 2/6 base. fails 0..4 -> 2/6, 2/5, 2/4, 2/3, 2/2 = 100% on attempt 5. Matches the wiki.",
+    "consequence": "Effective long-run rates are always >= the base rates in 'tiers'. 'drop-chances.json' in research/ already publishes the mercy-inflated effectiveRate per rewardKind x difficulty, so prefer it over the raw fraction when precision matters.",
+    "other_mercy": {
+      "summoning_portal": { "counterName": "summoning_portal_legendary_hero", "threshold": 100 },
+      "note": "separate system, unrelated to campaign drops"
+    },
+    "patch_note": "Patch 1.22 replaced the older 'jar of spheres' model with this mercy model."
+  },
+
+  "known_example": {
+    "case": "Legendary upgrade drop from an Elite campaign node",
+    "base_drop_chance": 0.3333,
+    "note": "Confirmed by wiki prose; matches tiers.Elite.Legendary."
+  },
+
+  "energy": {
+    "regen": {
+      "amount_per_interval": 1,
+      "interval_minutes": 5,
+      "per_hour": 12,
+      "per_day": 288,
+      "source": "user-confirmed (5 min) + research/datamine/gameconfig142.json staminaRegenerationTime 300 / staminaRegenerationAmount 1",
+      "note": "The earlier '6 minutes / 240 per day' figure was a mix-up with the 6 energy an attack costs in a normal mission."
+    },
+    "extra": {
+      "note": "Extra energy claimed on top of regen. Each source is assumed to be taken once per day; adjust per_day if some are repeatable. The report's daily budget = regen.per_day + sum(energy * per_day) = 638.",
+      "sources": [
+        { "label": "watch ad",            "energy": 60,  "bs_cost": 0,   "per_day": 1 },
+        { "label": "daily deal crate",    "energy": 30,  "bs_cost": 0,   "per_day": 1, "source": "tacticus.wiki.gg/wiki/Shops slot 1 - free crate at daily reset (previously missing from this budget)" },
+        { "label": "25 BS -> 60 energy",  "energy": 60,  "bs_cost": 25,  "per_day": 1 },
+        { "label": "50 BS -> 100 energy", "energy": 100, "bs_cost": 50,  "per_day": 1 },
+        { "label": "110 BS -> 100 energy","energy": 100, "bs_cost": 110, "per_day": 1, "source": "datamine $.clientGameConfig.shop staminaShopTiers = 25/50/110/250/500/1000/1500; wiki HDTW_DropRate also says 110 - the '100 BS' figure was a misremembering" }
+      ],
+      "bs_per_day": 185,
+      "value_order": "Cheapest blackstone first: 25 BS is 0.42 BS/energy, 50 BS is 0.50, 110 BS is 1.10 - so if you ever ration it, drop the 110 BS bundle first. Everything past that tier is worse than buying the item directly (see tacticus-shop-prices.json)."
+    },
+    "spender": {
+      "profile": "moderate",
+      "profiles": { "frugal": 2.5, "moderate": 5, "generous": 8 },
+      "note": "Personal buy ceiling = the highest shop-price / fair-floor ratio that still counts as a buy (the verdict scale runs STRONG BUY .. STRONG AVOID up to this ceiling). The FLOOR itself stays the cheapest paid refill (0.417 BS/E) - this only moves the verdict bands. CLI overrides: --spender <profile> or --threshold <ratio>. Calibrated on your own 2026-09-27 comfort data: 5 BS commons (2.0x) OK, 10 BS uncommons (3.0x) OK, 30/80 BS composites (2-4x) attractive, 220 BS rare (5.9x) rejected."
+    },
+    "attempt_cost": {
+      "Normal": 6,
+      "Mirror": 6,
+      "Extremis": 6,
+      "Elite": 10,
+      "EliteMirror": 10,
+      "source": "user-supplied, all five confirmed"
+    },
+    "daily_attempt_cap_per_node": {
+      "note": "From research/tacticus-planner-apps campaignBattleViewSchema.dailyAttempts + CampaignDenormalizer.DailyAttemptsForType: Elite/EliteMirror = 6/day, everything else = 10/day. Cross-checks the attemptsLeft/attemptsUsed maxima observed in tacticus-player.json.",
+      "Standard": 10,
+      "Mirror": 10,
+      "Extremis": 10,
+      "Elite": 6,
+      "EliteMirror": 6
+    },
+    "cap": {
+      "value": 60,
+      "source": "research/datamine/gameconfig142.json -> maxStamina: 60",
+      "note": "So the pool holds under one full Elite node (6 x 10 = 60) exactly; regen is wasted if not spent, and a day's full regen (240-288) covers 4-5 nodes at their attempt caps."
+    }
+  },
+
+  "campaigns": {
+    "note": "user-supplied. Four permanent campaigns, each with a Standard form, a Mirror form (opposite grand alliance), and an Elite form. Timed campaign events replace Elite with Extremis.",
+    "permanent": [
+      { "name": "Indomitus",      "alliance": "Imperial", "mirror_alliance": "Xenos" },
+      { "name": "Fall of Cadia",  "alliance": "Chaos",    "mirror_alliance": "Imperial" },
+      { "name": "Octarius",       "alliance": "Xenos",    "mirror_alliance": "Imperial" },
+      { "name": "Saim-Hann",      "alliance": "Xenos",    "mirror_alliance": "Chaos" }
+    ],
+    "timed_events": {
+      "note": "Timed campaign events have a third difficulty called Extremis INSTEAD OF Elite. This is why Extremis has its own rate tier and a 6-energy cost while Elite costs 10.",
+      "difficulties": ["Standard", "Mirror", "Extremis"]
+    },
+    "api_enum": {
+      "values": ["Standard", "Mirror", "Elite", "EliteMirror"],
+      "note": "The OpenAPI enum covers the permanent campaigns only; there is no Extremis value, consistent with Extremis living on event campaigns."
+    }
+  },
+
+  "unresolved": {
+    "tier_mapping": "RESOLVED: Normal=Standard (6 energy, permanent campaigns), Mirror=Mirror (6), Elite=Elite (10, permanent), EliteMirror=EliteMirror (10, rates shared with Elite per wiki 'Elite Mirror Campaigns use the Elite drop rates'), Extremis=the third difficulty of TIMED EVENT campaigns (6) - not in the API enum, has its own rate tier. Rate tiers therefore number four (Normal/Mirror/Extremis/Elite) while costs number five (EliteMirror reuses Elite's rates at Elite's cost).",
+    "regen_interval": "RESOLVED: 1 energy per 5 minutes = 288/day (user confirmed; earlier 6 min / 240 was a mix-up with the 6 energy a normal mission attack costs).",
+    "node_assignment": "RESOLVED - joined in energy_cost.py: research/tacticus-planner-api/src/TacticusPlanner.GameCatalog/Data/campaign-battles/*.json gives per-node energyCost + rewards.guaranteed + rewards.potential[].chanceId, and drop-chances.json turns chanceId into effectiveRate (mercy already baked in). rank_up_report.py --energy prices against the cheapest node per leaf.",
+    "event_campaign_in_data": "RESOLVED - the 6 timed event campaigns ARE present in campaign-battles (they carry chanceIds containing 'event'). They are priced separately as 'event' nodes and flagged in the report's Note column."
+  }
+}

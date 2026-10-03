@@ -1,0 +1,19 @@
+# Secrets — never commit
+.tacticus_api_key
+
+# Generated page; embeds the API key above (regenerate with gen_swagger.py)
+swagger-ui.html
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Editor / OS noise
+*.swp
+.DS_Store
+
+# Local player snapshot — roster data stays local
+tacticus-player.json
+
+# Research artifacts — third-party clones/data, local reference only
+research/

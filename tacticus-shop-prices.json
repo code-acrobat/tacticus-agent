@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "description": "Daily Deals / shop price reference for buy-vs-farm analysis. Two sources: the local datamine (authoritative config) and tacticus.wiki.gg (community, may lag). Conflicts are flagged. Farm-side costs come from energy_cost.py, not from this file.",
+  "sources": {
+    "datamine": "research/datamine/gameconfig142.json -> $.clientGameConfig.shop",
+    "wiki_shops": "https://tacticus.wiki.gg/wiki/Shops",
+    "wiki_droprate": "https://tacticus.wiki.gg/wiki/HDTW_DropRate",
+    "wiki_bsupgrades": "https://tacticus.wiki.gg/wiki/HDTW_BSUpgrades",
+    "wiki_requisitions": "https://tacticus.wiki.gg/wiki/HDTW_Requisitions"
+  },
+  "datamine_key_paths": {
+    "daily_deal_pool": "$.clientGameConfig.shop.merchants.<name>.products[][]  (reward, cost{type,amount}, cronSchedule '0 0 0 ? * * *' = daily, maxPurchases, conditions.lockId, weight)",
+    "priced_skus": "$.clientGameConfig.shop.products  (958 SKUs: stamina, chests, requisition, xp)",
+    "iap": "$.clientGameConfig.shop.realMoneyProducts (2214, price in cents USD)",
+    "offers": "$.clientGameConfig.shop.offers[] (2364, 371 with segment 'dailyOffers')",
+    "energy_ladder": "$.clientGameConfig.shop.staminaShopTiers + product_stamina_00..06",
+    "upgrade_craft_gold": "$.clientGameConfig.upgrades.<upgId>.gold",
+    "chest_contents": "$.clientGameConfig.loot.dropTables.upgrades*",
+    "requisition": "$.clientGameConfig.summoningPortal.summoningPortal1"
+  },
+
+  "energy_refills_blackstone": {
+    "note": "BS -> energy ladder. BS/E rises steeply; everything past ~110 BS is worse value than buying items outright.",
+    "tiers": [
+      {"bs": 25, "energy": 60, "bs_per_energy": 0.417, "also": "raidTicket:10"},
+      {"bs": 50, "energy": 100, "bs_per_energy": 0.5, "also": "raidTicket:15"},
+      {"bs": 110, "energy": 100, "bs_per_energy": 1.1},
+      {"bs": 250, "energy": 100, "bs_per_energy": 2.5},
+      {"bs": 500, "energy": 100, "bs_per_energy": 5.0},
+      {"bs": 1000, "energy": 100, "bs_per_energy": 10.0},
+      {"bs": 1500, "energy": 100, "bs_per_energy": 15.0}
+    ],
+    "free_per_day": {"regen": 288, "daily_crate": 30, "ad": 60, "note": "regen = 1/5min, cap 60 (see tacticus-drop-rates.json energy)"},
+    "conflict": "wiki lists 110 BS for the 3rd refill; user memory said 100 BS. Patch 1.31 'added one more refill of 60 Energy for 25 Blackstone' suggests 2x25 BS refills may exist. Wiki has no 100 BS row.",
+    "unverified": "slot 8 of Daily Deals reportedly lists 'Energy x60 -> 150 RT' (likely typo); a 2026-09 Reddit thread claims energy no longer appears in Daily Deals at all."
+  },
+
+  "single_upgrade_items_blackstone": {
+    "note": "RESOLVED - these are two different products (see conflicts_resolved.slot_3_vs_slot_9).",
+    "chosen_rarity_single__slot_9__authoritative": {"Common": "not sold", "Uncommon": 30, "Rare": 80, "Epic": "200|225|240 (E1xx series 675)", "Legendary": "320-755 (mode 690); L1xx 1655-1790; L2xx 2880", "Mythic": "2790|3005|3675", "stock": 2, "lock": "lock_daily_deal_<id>, daily cron, maxPurchases 2"},
+    "random_rarity_chest__slot_3": {"note": "loot.dropTables.upgrades* = randomRoll of that tier - NOT a chosen item", "gems": {"Common": 5, "Uncommon": 10, "Rare": 25, "Epic": 60, "Legendary": 150}, "gold": {"Common": "150|200", "Uncommon": "300|400", "Rare": "750|1000", "Epic": 2400, "Legendary": 6000}, "wiki_label": "wiki's 5/10/25/60/150 BS and 200/400/1000/2400/6000 coins are these chests, mislabeled as singles"},
+    "other_currencies_singles": {"note": "same upg* singles also sold in non-gem shops", "Legendary": "guildCredits 450 | crusadeCurrency 215 | event currency 8-145", "Mythic": "guildCredits 900 | crusadeCurrency 430 | elderShopCurrency 35 | event 15-185", "event_only": "seasonalEventCurrencyJune2026 sells U/R/E/M singles at 1-185"}
+  },
+
+  "typical_single_bs": {
+    "Common": 5,
+    "Uncommon": 30,
+    "Rare": 80,
+    "Epic": 225,
+    "Legendary": 690,
+    "Mythic": 3000,
+    "note": "Representative chosen-rarity single price per rarity, used by item_value.py's static SHOP/VERDICT columns (ladder B slot-9 modes: Epic 200|225|240 -> 225 with E1xx series at 675, Legendary 320-755 -> mode 690 with L1xx 1655-1790 / L2xx 2880, Mythic 2790|3005|3675 -> 3000). Common singles are NOT sold - 5 BS is the slot-3 random-rarity common chest. The cheaper chest ladder (5/10/25/60/150) is a DIFFERENT product (random item of the tier); exact offers are priced per item with --price."
+  },
+
+  "blackstone_income": {
+    "subscription": "Daily Shipment, $4.99 per 30 days (first purchase $2.99): 200 BS up-front + 60 BS/day = 2,000 BS / 30 days, ~67 BS/day effective - user's '60 BS/day for $5/month' VERIFIED (tacticus.wiki.gg/wiki/Shops)",
+    "promo_codes": {
+      "where": "official Discord #Promo-Codes-AKA-Rat-Gave-Up + ~50 partnered creators; dated log at tacticus.wiki.gg/wiki/2026Freebies",
+      "frequency": "~30-50 codes/month, only ~15-25% carry BS, usually 20-50 BS each; flash/outage codes 100-500",
+      "monthly_bs_2026": {"low": "50-150", "typical": "180-350", "high": "1000-1400 (May/Aug flash codes)", "mean": 410, "median": 180, "sample": "9 months to Sep 2026"},
+      "redemption": "Home > Settings > Input code; case-sensitive, one per account, flash codes often expire in 24-48h; needs campaign battle 15"
+    },
+    "other_sources": ["salvage runs (not quantified)", "free battle pass track +60 BS per 5-week season", "Discord contests ~1-3/month x 300 BS", "webstore freebie ~25 BS/month"],
+    "monthly_total_excl_salvage": {"low": 2100, "typical": 2250, "high": 3400},
+    "note": "Web research 2026-09-27. The 185 BS/day refill habit already outspends the subscription, so shop items are funded from the promo/salvage surplus - the spender profiles are signals over that surplus, not a strict budget. BS-in-codes trended down since June 2026; treat the high case as event-dependent."
+  },
+
+  "fair_price_floor_bs": {
+    "formula": "energy_to_farm x 0.417 (cheapest BS->energy = 25 BS -> 60 E)",
+    "per_single_leaf_item": {
+      "Common": {"energy": "5.7-8", "floor_bs": "2.4-3.3"},
+      "Uncommon": {"energy": "7.5-8", "floor_bs": "3.1-3.3"},
+      "Rare": {"energy": "9-10", "floor_bs": "3.7-4.2"},
+      "Epic": {"energy": "14-18", "floor_bs": "5.8-7.5"},
+      "Legendary": {"energy": "23.4-30", "floor_bs": "9.8-12.5"},
+      "Mythic": {"energy": 39, "floor_bs": 16.3, "note": "events only"}
+    },
+    "markup_if_datamine_prices": {"Uncommon": "~9x (30 vs 3.2)", "Rare": "~20x (80 vs 4.0)", "Epic": "~34x (225 vs 6.6)", "Legendary": "~62x (690 vs 11.1)", "Mythic": "~225x (3675 vs 16.3)", "verdict": "hypothesis confirmed IF the merchant rarity ladder is what the shop charges - markup grows with rarity"},
+    "markup_if_wiki_prices": {"Common": "~1.8x (5 vs 2.9)", "Uncommon": "~3x (10 vs 3.2)", "Rare": "~6x (25 vs 4.0)", "Epic": "~9x (60 vs 6.6)", "Legendary": "~14x (150 vs 11.1)", "verdict": "still monotonically increasing with rarity (1.8x -> 14x), but far less extreme"}
+  },
+
+  "composites": {
+    "wiki": "slot 9 sells a crafted upgrade; price = sum of component BS prices; full Legendary craft 1600-1800 BS (saves ~4 days); 3 Legendary singles = 18000 coins or 450 BS",
+    "rule": "fair price = expand recipe tree and sum leaf farm costs (energy_cost.price with empty inventory) - never price against the top-level item"
+  },
+
+  "other_prices": {
+    "equipment_bs": {"Uncommon": 19, "Rare": 49, "Epic": 149, "Legendary": 499},
+    "equipment_gold": {"Uncommon": 1299, "Rare": 3899, "Epic": 12000},
+    "badges_bs": {"Common x5": 65, "Uncommon x4": 99, "Rare x4": 199, "Epic x3": 299, "Legendary x2": 399, "Mythic x2": 519},
+    "orbs_bs": {"Uncommon x5": 149, "Rare x4": 279, "Epic x3": 495, "Legendary x2": 799, "Mythic": 899},
+    "shards": {"daily_deal": "x10 = 350 BS (stock 2)", "guild": "5 shards = 525 guildCredits", "heroConversion_by_rarity": [40, 80, 130, 250, 500]},
+    "components_x10_bs": 99,
+    "munitions_bs": {"x5": 75, "x10": 150},
+    "xp_books": {"datamine": "xpCommon 20 XP/gold 5 ... xpMythic 62500 XP/gold 2000", "wiki_bs": {"Common x15": 9, "Legendary x2": 199, "Legendary x10": 990}, "bundle_s": "75 BS", "bundle_l": "300 BS"},
+    "raid_tickets_bs": {"x10": 30, "x500": 1490},
+    "chests_bs": {"wood": 330, "bronze": 575, "silver": 1200, "gold": 2100, "diamond": 3300, "mythic": 4900, "wiki_alt": {"Blessed": 1200, "Ancient": 2100, "Artificer": 3300}},
+    "coins": {"daily_stack": "25 BS or ad -> 3000 coins (best, 120 coins/BS)", "Fistful": "299 BS -> 70k", "Pile": "699 BS -> 175k", "Mountain": "1990 BS -> 500k", "note": "coins can be bought with BS, never the reverse"},
+    "shop_refresh": {"bs": 50, "free_alt": "watch an ad", "unlimited": true},
+    "requisition": {"pull_1": "300 BS or 1 order", "pull_10": "3000 BS or 10 orders (10th guaranteed character)", "order_packs": "3 for 900 BS, 5 for 1500 BS (no discount)", "special_banners": "400 / 4000", "mercy": "summoning_portal_legendary_hero threshold 100; summoning_portal_guaranteed_hero threshold 9", "ev_from_weights": {"note": "base weights, mercy ignored, before duplicate-to-shard conversion", "p_full_unit": "18.33% (Legendary 0.60%, non-Leg hero 15.99%, MoW 1.74%)", "p_shards": "59.08%", "p_orbs": "22.59%", "expected_shards_per_pull": 8.15, "expected_orbs_per_pull": 0.9, "duplicate_conversion_shards": {"Common": 40, "Uncommon": 80, "Rare": 130, "Epic": 250, "Legendary": 500}, "tables": "loot.dropTables.summoningPortal (total 14487: heroesLegendary 87, step_2 14400) -> step_2 (total 286: heroesAllWithoutLegendary 46, machinesOfWar 5, shards 170, orbs 65)"}, "community_verdict": "not worth it - no numeric EV table published"},
+    "real_money_blackstone": {"best": "Daily Shipment $4.99 -> 200 BS + 60/day x 30 = 400.8 BS/USD", "large": "$99.99 -> 14500 BS (145 BS/USD)", "first_buy": "double blackstone on first purchase of each cash bundle"}
+  },
+
+  "daily_deals_layout": {
+    "slots": 9,
+    "refresh": "daily at reset (cron 0 0 0 ? * * *)",
+    "slot_1": "free crate every day (after refresh: a rare upgrade at discount)",
+    "slot_2": "single upgrades priced in coins (see conflict)",
+    "slot_3": "single upgrades in blackstone; components x10 = 99; munitions 75/150; shards x10 = 350",
+    "slots_4_7": "equipment",
+    "slot_5": "badges", "slot_6": "orbs",
+    "slot_8": "XP books / raid tickets (weekends weighted to XP)",
+    "slot_9": "crafted (composite) upgrade, price = sum of components",
+    "stock_limits": "most slots stock 2-5",
+    "pool_is_random": "datamine gives only the weighted pool (weight, conditions.minPowerLevel, lockId) - today's picks are server-rolled, no fixed calendar exists"
+  },
+
+  "buy_vs_farm_rules": {
+    "1": "Buy refills at 25 and 50 BS (0.417 and 0.5 BS/E); the 110 BS tier (1.1 BS/E) is the community's accepted last refill.",
+    "2": "Past that, direct item purchases beat energy refills - community consensus: 'buy energy at 50 and 110 BS, after that buy cheaper upgrades (common, uncommon, rare) from daily shop'.",
+    "3": "Buying wins only when attempts (10/day standard, 6/day elite per node), event rotation, or calendar time are binding - node caps ~9 Common / 6-7 Rare / 4 Epic / 2-3 Legendary per Elite node per day.",
+    "4": "Gold-priced Daily Deals are widely considered fine (coins are plentiful); BS-priced deals are widely considered 'very overpriced'.",
+    "5": "Compare any price against fair_price_floor_bs first, then decide if the premium is buying you time you do not have."
+  },
+
+  "conflicts_resolved": {
+    "slot_3_vs_slot_9": "RESOLVED 2026-09-27 - they are DIFFERENT PRODUCTS, not rival prices. Ladder (A) 5/10/25/60/150 BS is slot 3's RANDOM-rarity chest (loot.dropTables.upgrades* = type randomRoll over that tier, n=1 per tier). Ladder (B) 30/80/~225/~690/~3000 BS is the chosen-rarity single upg* pool in slot 9 (351 entries, every one lockId=lock_daily_deal_<id>, maxPurchases 2, daily cron). Markups in fair_price_floor_bs use (B) for singles.",
+    "coin_ladder": "wiki 200/400/1000/2400/6000 vs datamine gold 150/300/750/2400/6000 - datamine has both amounts (150|200, 300|400, 750|1000) as separate entries; wiki likely shows the higher one. Unresolved, immaterial.",
+    "third_refill": "RESOLVED: datamine staminaShopTiers = 25/50/110/250/500/1000/1500 - it is 110 BS, not 100."
+  },
+  "conflicts": [
+    "wiki has no Mythic in Daily Deals; datamine merchant pool has 30 Mythic slots (2790/3005/3675 gems)",
+    "requisition EV: now computed from weights (see requisition.ev) - no community table published"
+  ],
+
+  "not_found": [
+    "fixed weekday rotation calendar for Daily Deals (pool is random/weighted)",
+    "dollar value per requisition pull",
+    "single Mythic item listings in Daily Deals (wiki), only in Crusade/Rogue Trader/Guild shops"
+  ]
+}
