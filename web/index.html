@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>tacticus-agent</title>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/datatables.net@2.1.8/js/dataTables.min.js" defer></script>
 <style>
   :root { color-scheme: dark; }
@@ -165,7 +166,7 @@ function sortable(root) {
   if (typeof DataTable === 'undefined') return;
   root.querySelectorAll('table[id^="dt"]').forEach(t => {
     try { new DataTable(t, { paging: false, searching: false, info: false, order: [] }); }
-    catch (e) { /* table still renders, just not sortable */ }
+    catch (e) { console.warn('table sort unavailable', e); }
   });
 }
 
