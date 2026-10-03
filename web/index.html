@@ -20,12 +20,15 @@
   #row { display: flex; gap: .5rem; margin-top: .6rem; }
   #q { flex: 1; }
   .note { color: #777; font-size: .85rem; }
+  .note a { color: #8ab4f8; }
 </style>
 </head>
 <body>
 <h1>tacticus-agent <small>— decision cockpit, computed in your browser</small></h1>
 <p class="note">Your API key goes only through the proxy to the game API — never stored, never sent to the
-LLM. Reports run locally via Pyodide; only the chat relay leaves this page.</p>
+LLM. Reports run locally via Pyodide. Chat is the one exception: your account summary and messages are
+sent to <a href="https://groq.com" rel="noopener">Groq</a> to generate replies. Run it yourself from
+the <a href="https://github.com/code-acrobat/tacticus-agent" rel="noopener">source on GitHub</a> (MIT).</p>
 <div id="row">
   <input id="key" type="password" placeholder="Tacticus API key (X-API-KEY)" autocomplete="off">
   <button id="load">Load account</button>
@@ -40,7 +43,7 @@ LLM. Reports run locally via Pyodide; only the chat relay leaves this page.</p>
   </div>
 </div>
 <script>
-/* Patch after `wrangler deploy` — the workers.dev URL it prints. */
+/* Committed = the deployed worker URL. Update it with any worker rename, then push. */
 const WORKER = 'https://tacticus-agent.tacticus-agent.workers.dev';
 const CDN = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/';
 let py = null, booted = false, brief = '', busy = false;
