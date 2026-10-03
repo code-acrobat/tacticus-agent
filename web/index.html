@@ -6,37 +6,46 @@
 <title>tacticus-agent</title>
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/datatables.net@2.1.8/js/dataTables.min.js" defer></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/dark.min.css" id="theme-dark">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/light.min.css" id="theme-light" disabled>
 <style>
-  :root { color-scheme: dark; }
-  body { font: 15px/1.5 system-ui, sans-serif; max-width: 60rem; margin: 2rem auto; padding: 0 1rem; background: #111; color: #ddd; }
-  h1 { font-size: 1.3rem; } h1 small { color: #888; font-weight: normal; }
-  input, button { font: inherit; padding: .45rem .7rem; border-radius: .4rem; border: 1px solid #444; background: #1b1b1b; color: #eee; }
-  button { cursor: pointer; background: #2b6; border-color: #2b6; color: #041; font-weight: 600; }
+  /* water.css styles the elements (dark build by default; #theme flips it);
+     this block only adds what it does not know: bubbles, brief, sort arrows. */
+  :root { color-scheme: light dark; }
+  body { max-width: 60rem; margin: 2rem auto; padding: 0 1rem; }
+  #head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+  h1 { font-size: 1.3rem; }
+  h1 small { color: rgba(127,127,127,.75); font-weight: normal; }
   button:disabled { opacity: .5; cursor: default; }
-  #status { margin: .6rem 0; color: #9ad; min-height: 1.4em; }
-  #brief { white-space: pre-wrap; background: #0c0c0c; border: 1px solid #333; border-radius: .5rem; padding: 1rem; overflow-x: auto; font: 13px/1.45 ui-monospace, monospace; }
+  #status { margin: .6rem 0; min-height: 1.4em; color: var(--links, #8ab4f8); }
+  #brief { white-space: pre-wrap; overflow-x: auto; padding: 1rem; border-radius: .5rem;
+           border: 1px solid rgba(127,127,127,.35); background: rgba(127,127,127,.08);
+           font: 13px/1.45 ui-monospace, monospace; }
   #chat { margin-top: 1.5rem; }
   .msg { padding: .5rem .8rem; margin: .4rem 0; border-radius: .6rem; max-width: 92%; white-space: pre-wrap; }
-  .you { background: #1d3a5f; margin-left: auto; }
-  .bot { background: #1e1e1e; border: 1px solid #333; }
-  #row { display: flex; gap: .5rem; margin-top: .6rem; }
+  .msg.you { margin-left: auto; background: #1d3a5f; color: #fff; }
+  .msg.bot { background: rgba(127,127,127,.14); border: 1px solid rgba(127,127,127,.35); }
+  #row { display: flex; gap: .5rem; align-items: center; margin-top: .6rem; }
   #q { flex: 1; }
-  .note { color: #777; font-size: .85rem; }
-  .note a { color: #8ab4f8; }
+  .note { color: rgba(127,127,127,.9); font-size: .85rem; }
   .msg p { margin: .3rem 0; }
-  table { border-collapse: collapse; margin: .5rem 0; font-size: .9em; }
-  th, td { border: 1px solid #333; padding: .3rem .6rem; text-align: left; vertical-align: top; }
-  th { background: #1d3a5f; }
+  table { border-collapse: collapse; font-size: .9em; }
+  th, td { padding: .3rem .6rem; text-align: left; vertical-align: top;
+           border: 1px solid rgba(127,127,127,.35); }
+  th { background: rgba(127,127,127,.15); font-weight: 600; }
   #tools td:first-child { white-space: nowrap; }
   .msg th { cursor: pointer; white-space: nowrap; }
-  .msg th:hover { color: #8ab4f8; }
+  .msg th:hover { color: var(--links, #8ab4f8); }
   .msg th[aria-sort="ascending"]::after { content: ' \25B2'; }
   .msg th[aria-sort="descending"]::after { content: ' \25BC'; }
-  a.getkey { color: #8ab4f8; font-size: .85rem; align-self: center; white-space: nowrap; }
+  a.getkey { font-size: .85rem; white-space: nowrap; }
 </style>
 </head>
 <body>
+<header id="head">
 <h1>tacticus-agent <small>— decision cockpit, computed in your browser</small></h1>
+<button id="theme" type="button">light</button>
+</header>
 <p class="note">Your API key goes only through the proxy to the game API — never stored, never sent to the
 LLM. Reports run locally via Pyodide. Chat is the one exception: your account summary and messages are
 sent to <a href="https://groq.com" rel="noopener">Groq</a> to generate replies. Run it yourself from
@@ -84,6 +93,21 @@ let py = null, booted = false, brief = '', busy = false;
 const $ = id => document.getElementById(id);
 const status = t => { $('status').textContent = t; };
 const say = e => { status('⚠ ' + (e && e.message || e)); };
+
+/* dark by default; the button enables water.css's other build */
+let theme = localStorage.getItem('tacticusTheme') || 'dark';
+function applyTheme() {
+  $('theme-dark').disabled = theme !== 'dark';
+  $('theme-light').disabled = theme !== 'light';
+  document.documentElement.style.colorScheme = theme;
+  $('theme').textContent = theme === 'dark' ? '☀ light' : '☾ dark';
+}
+applyTheme();
+$('theme').addEventListener('click', () => {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('tacticusTheme', theme);
+  applyTheme();
+});
 
 function guard() {
   if (!WORKER.includes('REPLACE-ME')) return true;
