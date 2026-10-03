@@ -53,7 +53,10 @@ export default {
         'situation was computed by deterministic tools and is given below as a ' +
         'brief. Ground every recommendation in it; when asked about something ' +
         'the brief does not cover, say so plainly instead of guessing. Be ' +
-        'concise and actionable. Never ask for or repeat API keys.\n\n' +
+        'concise and actionable. Never ask for or repeat API keys. Where things ' +
+        "live in it: WHERE I'M BLOCKED = gates per hero; item 3) FARM = energy, " +
+        '+power and pow/E per rung (power bought by the next rank-up), which is ' +
+        'also echoed in the NEXT: chain.\n\n' +
         '--- BRIEF ---\n' + String(brief).slice(0, 40000);
       const r = await fetch(
         (env.LLM_BASE_URL || 'https://api.openai.com/v1') + '/chat/completions',
