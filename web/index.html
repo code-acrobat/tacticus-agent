@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>tacticus-agent</title>
+<script src="https://cdn.jsdelivr.net/npm/datatables.net@2.1.8/js/dataTables.min.js" defer></script>
 <style>
   :root { color-scheme: dark; }
   body { font: 15px/1.5 system-ui, sans-serif; max-width: 60rem; margin: 2rem auto; padding: 0 1rem; background: #111; color: #ddd; }
@@ -21,6 +22,13 @@
   #q { flex: 1; }
   .note { color: #777; font-size: .85rem; }
   .note a { color: #8ab4f8; }
+  .msg p { margin: .3rem 0; }
+  .msg table { border-collapse: collapse; margin: .5rem 0; font-size: .9em; }
+  .msg th, .msg td { border: 1px solid #333; padding: .3rem .6rem; text-align: left; }
+  .msg th { background: #1d3a5f; cursor: pointer; white-space: nowrap; }
+  .msg th:hover { color: #8ab4f8; }
+  .msg th[aria-sort="ascending"]::after { content: ' \25B2'; }
+  .msg th[aria-sort="descending"]::after { content: ' \25BC'; }
 </style>
 </head>
 <body>
@@ -114,10 +122,58 @@ async function loadAccount() {
   finally { busy = false; $('load').disabled = false; }
 }
 
+/* Chat replies come back as markdown: render them, with tables as real
+   sortable <table>s (DataTables, loaded from the same CDN as Pyodide). */
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+const isSep = s => /^\s*\|?[\s:|-]*-{3,}[\s:|-]*\|?\s*$/.test(s);
+const cells = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+let tid = 0;
+
+function tableHTML(rows) {
+  const head = cells(rows[0]);
+  const body = rows.slice(1).map(cells);
+  return '<table id="dt' + (++tid) + '"><thead><tr>' + head.map(h => '<th>' + inline(h) + '</th>').join('') +
+    '</tr></thead><tbody>' + body.map(r =>
+      head.map((_, i) => '<td>' + inline(r[i] || '') + '</td>').join('')).join('') +
+    '</tbody></table>';
+}
+
+function md2html(src) {
+  const L = src.split('\n'), out = [];
+  let para = [], tbl = [];
+  const flushP = () => { if (para.length) { out.push('<p>' + para.map(inline).join('<br>') + '</p>'); para = []; } };
+  const flushT = () => {
+    const rows = tbl.filter(r => !isSep(r));
+    out.push(rows.length >= 2 ? tableHTML(rows) : '<p>' + rows.map(inline).join('<br>') + '</p>');
+    tbl = [];
+  };
+  for (let i = 0; i < L.length; i++) {
+    const s = L[i];
+    const row = s.includes('|') &&
+      (tbl.length || s.trim().startsWith('|') || (s.includes(' | ') && isSep(L[i + 1] || '')));
+    if (row) { flushP(); tbl.push(s); continue; }
+    if (tbl.length) flushT();
+    if (!s.trim()) flushP(); else para.push(s);
+  }
+  if (tbl.length) flushT();
+  flushP();
+  return out.join('');
+}
+
+function sortable(root) {
+  if (typeof DataTable === 'undefined') return;
+  root.querySelectorAll('table[id^="dt"]').forEach(t => {
+    try { new DataTable(t, { paging: false, searching: false, info: false, order: [] }); }
+    catch (e) { /* table still renders, just not sortable */ }
+  });
+}
+
 function bubble(who, text) {
   const d = document.createElement('div');
   d.className = 'msg ' + who;
-  d.textContent = text;
+  if (who === 'bot') { d.innerHTML = md2html(text); sortable(d); }
+  else d.textContent = text;
   $('msgs').appendChild(d);
   d.scrollIntoView({ block: 'nearest' });
 }
