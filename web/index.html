@@ -24,12 +24,15 @@
   .note { color: #777; font-size: .85rem; }
   .note a { color: #8ab4f8; }
   .msg p { margin: .3rem 0; }
-  .msg table { border-collapse: collapse; margin: .5rem 0; font-size: .9em; }
-  .msg th, .msg td { border: 1px solid #333; padding: .3rem .6rem; text-align: left; }
-  .msg th { background: #1d3a5f; cursor: pointer; white-space: nowrap; }
+  table { border-collapse: collapse; margin: .5rem 0; font-size: .9em; }
+  th, td { border: 1px solid #333; padding: .3rem .6rem; text-align: left; vertical-align: top; }
+  th { background: #1d3a5f; }
+  #tools td:first-child { white-space: nowrap; }
+  .msg th { cursor: pointer; white-space: nowrap; }
   .msg th:hover { color: #8ab4f8; }
   .msg th[aria-sort="ascending"]::after { content: ' \25B2'; }
   .msg th[aria-sort="descending"]::after { content: ' \25BC'; }
+  a.getkey { color: #8ab4f8; font-size: .85rem; align-self: center; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -41,9 +44,30 @@ the <a href="https://github.com/code-acrobat/tacticus-agent" rel="noopener">sour
 <div id="row">
   <input id="key" type="password" placeholder="Tacticus API key (X-API-KEY)" autocomplete="off">
   <button id="load">Load account</button>
+  <a class="getkey" href="https://api.tacticusgame.com/" rel="noopener">Get an API key ↗</a>
 </div>
 <div id="status"></div>
 <pre id="brief" hidden></pre>
+<div id="tools">
+  <p class="note"><strong>What the agent can answer</strong> — the MCP tools behind this
+  repo. The chat below replies from your <code>next_step</code> brief; a connected agent
+  can run any tool here.</p>
+  <table>
+    <thead><tr><th>Tool</th><th>Answers</th></tr></thead>
+    <tbody>
+      <tr><td><code>next_step</code></td><td>Where am I blocked and what should I do next?</td></tr>
+      <tr><td><code>rank_up_report</code></td><td>Who is closest to the next rank — and what does it cost in energy?</td></tr>
+      <tr><td><code>xp_gate</code></td><td>Which heroes are blocked on hero XP, and which books would fix it?</td></tr>
+      <tr><td><code>ability_gate</code></td><td>Which heroes are blocked on alliance badges?</td></tr>
+      <tr><td><code>gear_report</code></td><td>Who is below the gear target, and what do my spare pieces cover?</td></tr>
+      <tr><td><code>power_delta</code></td><td>How much power does the next rank-up buy?</td></tr>
+      <tr><td><code>team_roster</code></td><td>Which curated guild-raid comps can I field?</td></tr>
+      <tr><td><code>machine_hunt</code></td><td>Where do Mechanical enemies die cheapest — and what does the event window look like?</td></tr>
+      <tr><td><code>item_value</code></td><td>Is this shop offer worth buying, or should I farm it?</td></tr>
+      <tr><td><code>player_refresh</code></td><td>Re-fetch the live player snapshot.</td></tr>
+    </tbody>
+  </table>
+</div>
 <div id="chat" hidden>
   <div id="msgs"></div>
   <div id="row">
