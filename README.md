@@ -78,7 +78,7 @@ matching its own command line.
 | `browser_harness.py` | Pyodide runner: extracts the bundle, shims the two `subprocess` call sites in-process. Self-check: `python3 browser_harness.py` (byte-equal vs real subprocess). |
 | `web/index.html` | Browser front end: Pyodide in-tab, brief via `next_step`, chat via the Worker proxy. Key stays in the tab (sessionStorage) and only transits the proxy to the game API. Chat replies render as HTML — markdown tables become sortable tables (DataTables + jQuery, jsDelivr). The key field links to the key generator (`https://api.tacticusgame.com/`), and a static table lists what this page ships (gates, farm incl. `+power`, purchases, events, chat); a `Hunt nodes` button runs `machine_hunt --items` in-browser. Layout comes from water.css — dark by default, header button toggles light/dark. |
 | `worker/worker.js` | Cloudflare Worker: `/player` CORS pass-through (key never stored), `/chat` LLM relay over the precomputed brief. |
-| `.github/workflows/pages.yml` | Deploys the site to GitHub Pages (re-fetches gitignored `research/`, pinned). |
+| `.github/workflows/pages.yml` | Deploys the site to GitHub Pages (re-fetches gitignored `research/`, pinned); a fast `test` job (`py_compile` + MCP smoke + `check_page.py`) gates the build, actions are SHA-pinned. |
 | `.tacticus_api_key` | API key (`chmod 600`), read by `gen_swagger.py` |
 
 ## Regenerating the UI
@@ -1040,7 +1040,9 @@ Secrets apply immediately — no redeploy. The worker URL is
 `WORKER` const in `web/index.html`, so update it in the same change that renames
 the worker.
 
-**Deploy.** Push to `main` → `pages.yml` re-fetches the gitignored `research/`
+**Deploy.** Push to `main` → the `test` job runs first (byte-compile, MCP
+initialize smoke, `check_page.py` — well under a second) and gates the build →
+`pages.yml` re-fetches the gitignored `research/`
 (planner pinned by `PLANNER_SHA`, gameconfig pinned by commit), runs
 `make_bundle.py`, publishes the three files. One-time repo setting:
 **Settings → Pages → Source: GitHub Actions**.
