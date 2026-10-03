@@ -88,7 +88,8 @@ when behaviour changes.
 | `browser_harness.py` | Pyodide runner: `bootstrap()` extracts the bundle + writes the visitor snapshot, `install()` shims the 2 `subprocess` call sites (next_step, machine_hunt) to in-process `run_cli()` (argv + captured stdout, mimics `CompletedProcess`). Self-check: `python3 browser_harness.py` must be byte-equal to a real subprocess run of 3 witnesses. **Not a witness** (runner, not a report — invariant 7). |
 | `web/index.html` | Pages front end: loads Pyodide (CDN, pinned v0.26.2), bootstraps the harness, fetches the player via the Worker (`POST /player`), renders `next_step --top 10` text as the brief, chat → `POST /chat`. Key lives in sessionStorage only; reports compute in the browser. Chat replies render as HTML (markdown tables → sortable `<table>`, DataTables + jQuery from jsDelivr). Key field links to `https://api.tacticusgame.com/` (key generation); a static table above the chat lists what this page ships (blocked gates, farm incl. `+power`, purchases, live events, chat) — not the repo MCP tool list. Next to the brief, a `Hunt nodes` button runs `machine_hunt --items` in-browser (the brief's CLI hint). Layout: water.css (dark build by default; the header `#theme` button flips light/dark, choice kept in `localStorage`). `WORKER` const is committed = the deployed worker URL (`https://<worker>.<account-subdomain>.workers.dev`) — update it in the same change that renames the worker, then push so Pages rebuilds. |
 | `worker/worker.js` | Cloudflare Worker proxy (+ `worker/wrangler.toml`): `/player` = CORS pass-through to the game API (key never stored), `/chat` = LLM call over the precomputed brief (game key never reaches the LLM; secrets `LLM_KEY`, `LLM_MODEL`, optional `LLM_BASE_URL` = OpenAI-compatible default). In-memory 30/min/IP. |
-| `.github/workflows/pages.yml` | Pages deploy: re-fetches gitignored `research/` (planner pinned by `PLANNER_SHA` — bump on sync, gameconfig pinned by file), runs `make_bundle.py`, publishes `web/index.html` + bundle + harness. One-time repo setting: Pages Source = "GitHub Actions". |
+| `.github/workflows/pages.yml` | Pages deploy: re-fetches gitignored `research/` (planner pinned by `PLANNER_SHA` — bump on sync, gameconfig pinned by file), runs `make_bundle.py`, publishes `web/index.html` + bundle + harness. A **`test` job gates it** (`py_compile *.py` + MCP `initialize` smoke + `check_page.py`, <1 s); actions are SHA-pinned with the release tag in a comment (bump: `gh api repos/actions/checkout/commits/v4.4.0 --jq .sha` — commits endpoint, not the tag one), Dependabot bumps them weekly (`.github/dependabot.yml`), `concurrency: pages / cancel-in-progress: false`, `timeout-minutes` per job. One-time repo setting: Pages Source = "GitHub Actions". |
+| `check_page.py` | Static page/worker check for CI (~0.2 s, needs `node`): inline `<script>` `node --check`, every `$('id')` the script touches resolves against the markup, shipped markers present (`#tools`, `#hunt`, `machine_hunt`, `#theme`, water.css, key link), `worker/worker.js` parsed as `.mjs`. Reads nothing else — no player, no `research/`. Not a witness (invariant 7). |
 | `.tacticus_api_key` | Key, `chmod 600`, no trailing newline. Source for key injection. |
 | `README.md` | Human docs; update alongside this file. |
 | `research/` | **Git-ignored (`research/`)**. Offline copies of every third-party source used for game-mechanics research, moved here from `/tmp` so investigations can resume. See `research/README.md` for provenance and the "what each dir is good for" map. ~74 MB. |
@@ -359,6 +360,9 @@ the guild-war shop.
 # regenerate the page (after spec refresh or key rotation)
 python3 gen_swagger.py
 
+# static page/worker checks (what CI's test job runs; needs node)
+python3 check_page.py
+
 # refresh the cached player data (atomic write; --pretty to indent, -q quiet)
 python3 update_player.py
 
@@ -458,7 +462,7 @@ git -C research/tacticus-planner-apps pull --ff-only
 
 ```bash
 python3 -m py_compile *.py &&
-for c in "rank_up_report.py --energy --json" "xp_gate.py --json" "ability_gate.py --json" "power_delta.py --json" "gear_report.py --json" "team_roster.py --json" "item_value.py --json" "machine_hunt.py --json" "machine_hunt.py --selftest" "next_step.py --json"; do
+for c in "rank_up_report.py --energy --json" "xp_gate.py --json" "ability_gate.py --json" "power_delta.py --json" "gear_report.py --json" "team_roster.py --json" "item_value.py --json" "machine_hunt.py --json" "machine_hunt.py --selftest" "next_step.py --json" "check_page.py"; do
   python3 $c >/dev/null || echo "FAIL: $c"
 done
 ```
