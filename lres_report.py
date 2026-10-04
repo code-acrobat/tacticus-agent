@@ -286,6 +286,19 @@ def analyse(lane_filter=None):
         warnings = [f"no owned unit covers +{o['score']} {obj_label(o)}"
                     for o in objs if obj_label(o) not in covered]
 
+        # swap pool: every owned coverer per specialisation, best power first
+        t_ids = {t["id"] for t in team}
+        pools = []
+        for o in objs:
+            lbl = obj_label(o)
+            coverers = sorted((s for s in scored if lbl in s["covers"]),
+                              key=lambda s: -PW.get(s["id"], 0))
+            pools.append({"label": lbl, "score": o["score"],
+                          "heroes": [{"id": s["id"], "name": s["name"],
+                                      "power": PW.get(s["id"], 0),
+                                      "in_lineup": s["id"] in t_ids}
+                                     for s in coverers[:8]]})
+
         # power ladder: objective team + strongest allowed 5 vs each tier
         battles = lres[track]["battles"]
         team_pw = sum(PW.get(t["id"], 0) for t in team)
@@ -314,6 +327,7 @@ def analyse(lane_filter=None):
             "objectives": [{"score": o["score"], "type": o["objectiveType"],
                             "target": o.get("objectiveTarget", ""),
                             "label": obj_label(o)} for o in objs],
+            "pools": pools,
             "team": team, "team_pts": sum(t["pts"] for t in team),
             "warnings": warnings,
             "power": {"obj_team": team_pw,
@@ -380,6 +394,13 @@ def report(d):
                   f"{L['team_pts'] + L['base_pts']} before kills ({L['kill_pts']}/kill)")
         for wmsg in L["warnings"]:
             print(f"      ! {wmsg}")
+        if L.get("pools"):
+            print("   POOL per specialisation (owned coverers, best power "
+                  "first; * = in the lineup):")
+            for p in L["pools"]:
+                names = ", ".join(("*" if h["in_lineup"] else "") + h["name"]
+                                  for h in p["heroes"]) or "-"
+                print(f"      +{p['score']:>3} {p['label']:<14} {names}")
         pw = L["power"]
         print(f"   POWER: lineup {pw['obj_team']:,} | strongest allowed 5 (ceiling, "
               f"ignores specialisation) {pw['best5_total']:,} "
@@ -420,7 +441,8 @@ def main(argv=None):
         assert d["lanes"], "no lanes analysed"
         for L in d["lanes"]:
             if "cleared" not in L:
-                assert L["team"] and L["ladder"] and "wall" in L["power"]
+                assert L["team"] and L["ladder"] and L["pools"] \
+                    and "wall" in L["power"]
         assert d["missions"] and all("rows" in m for m in d["missions"])
         print(f"selftest PASS ({len(d['lanes'])} lane(s), "
               f"{len(d['missions'])} farm missions)")
