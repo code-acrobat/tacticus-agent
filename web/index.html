@@ -62,8 +62,11 @@ the <a href="https://github.com/code-acrobat/tacticus-agent" rel="noopener">sour
 <div id="huntrow">
   <button id="hunt" type="button" disabled>Hunt nodes ⚔</button>
   <span class="note">runs <code>machine_hunt --items</code> in your browser — Mechanical nodes ranked by event points per energy</span>
+  <button id="lres" type="button" disabled>Uthar event ⚔</button>
+  <span class="note">runs <code>lres_report</code> in your browser — next-battle teams, power walls, mission farms</span>
 </div>
 <pre id="huntout" hidden></pre>
+<pre id="lresout" hidden></pre>
 <div id="tools">
   <p class="note"><strong>What this page ships</strong> — everything below is computed in
   your browser from your snapshot by <code>next_step</code> (seven witnesses); the chat
@@ -129,6 +132,23 @@ $('hunt').addEventListener('click', async () => {
   finally { busy = false; $('hunt').disabled = false; }
 });
 
+/* lres_report (Uthar LRES) runs in the same runtime — teams, walls, farms */
+let lresOn = false;
+$('lres').addEventListener('click', async () => {
+  if (lresOn) { $('lresout').hidden = true; $('lres').textContent = 'Uthar event ⚔'; lresOn = false; return; }
+  if (busy || !booted) return;
+  busy = true; $('lres').disabled = true;
+  try {
+    status('building Uthar event report (lres_report)…');
+    $('lresout').textContent = await py.runPythonAsync('str(_h.run_cli("/tacticus/lres_report.py", []).stdout)');
+    $('lresout').hidden = false;
+    $('lres').textContent = 'Hide Uthar event';
+    lresOn = true;
+    status('ready');
+  } catch (e) { say(e); }
+  finally { busy = false; $('lres').disabled = false; }
+});
+
 function guard() {
   if (!WORKER.includes('REPLACE-ME')) return true;
   status('set WORKER in index.html (deploy the Cloudflare worker first)');
@@ -187,6 +207,7 @@ async function loadAccount() {
     $('chat').hidden = false;
     $('ask').disabled = false;
     $('hunt').disabled = false;
+    $('lres').disabled = false;
     status('ready — brief computed locally; ask away below');
   } catch (e) { say(e); }
   finally { busy = false; $('load').disabled = false; }

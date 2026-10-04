@@ -48,6 +48,8 @@ for marker in (
     'id="tools"',          # what-this-page-ships table
     'id="hunt"',           # Hunt nodes button
     "machine_hunt",        # its CLI reference
+    'id="lres"',           # Uthar event button
+    "lres_report",         # its CLI reference
     'id="theme"',          # light/dark toggle
     "water.css@2/out/dark.min.css",
     "What this page ships",

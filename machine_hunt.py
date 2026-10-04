@@ -18,7 +18,7 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from rank_up_report import run  # noqa: E402
@@ -71,10 +71,42 @@ def event_window(now):
     return None
 
 
+def legendary_cycle(now):
+    """Window of the Fixed legendary-event cycle covering now, else the next one.
+
+    Planner lists no *occurrence* for the LRES (it only has the definition), so
+    derive it: anchorUtc + k*intervalDays, durationDays long. Calibrated against
+    the in-game countdown 2026-10-04 (Oct 4 00:00Z -> Oct 11 00:00Z = 6d 16h).
+    """
+    f = DATA / "events" / "event-definitions.json"
+    if not f.exists():
+        return None
+    d = next((x for x in json.load(open(f))
+              if x.get("id") == "legendary-event"), None)
+    rec = (d or {}).get("recurrence") or {}
+    if rec.get("kind") != "Fixed" or not rec.get("intervalDays"):
+        return None
+    anchor = datetime.fromisoformat(rec["anchorUtc"].replace("Z", "+00:00"))
+    step = timedelta(days=int(rec["intervalDays"]))
+    dur = timedelta(days=int(rec.get("durationDays") or 7))
+    k = 0 if now < anchor else int((now - anchor) // step)
+    start, end = anchor + step * k, anchor + step * k + dur
+    if now > end:                       # cycle finished - jump to the next one
+        start, end = start + step, end + step
+    return start, end
+
+
 def event_list(now, cap=4):
-    """Live events first, then upcoming: [{id, start, end, live}]."""
-    evs = sorted((e for e in _occurrences() if e[2] >= now),
-                 key=lambda e: (e[1] > now, e[1]))
+    """Live events first, then upcoming: [{id, start, end, live}].
+
+    Includes the derived legendary-event (LRES) cycle alongside the planned
+    occurrences - the LRES window rides this list into next_step's EVENTS.
+    """
+    evs = [(d, s, e) for d, s, e in _occurrences() if e >= now]
+    cyc = legendary_cycle(now)
+    if cyc:
+        evs.append(("legendary-event", cyc[0], cyc[1]))
+    evs.sort(key=lambda e: (e[1] > now, e[1]))
     return [{"id": d, "start": s.isoformat(), "end": e.isoformat(),
              "live": s <= now <= e} for d, s, e in evs[:cap]]
 

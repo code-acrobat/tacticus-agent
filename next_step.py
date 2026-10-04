@@ -73,6 +73,8 @@ WITNESSES = {
 EVENT_STRATEGY = {
     "hse-machine-hunt":
         "python3 machine_hunt.py --items - nodes ranked by event Pt/E, attempts honored",
+    "legendary-event":
+        "python3 lres_report.py - next-battle teams, power walls, mission farms",
 }
 
 # hero gates, in report order. RANKUP gates are the ones that keep a hero

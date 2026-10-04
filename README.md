@@ -96,13 +96,14 @@ matching its own command line.
 | `team_roster.py` | **Which curated team comps can you field?** The 7 community guild-raid comps (terminus-maximus + cognitae, via the planner) checked against your roster: signature / core / flex / MoW ownership, a 5-hero pool count and a `fieldable` / `no signature` / `thin N/5` verdict. Deliberately computes **no synergy score** (no combo key exists in config). Query = one comp in detail, `--json` |
 | `next_step.py` | **The assembler** — "where am I blocked, what should I do next?" in one screen. Convenes the seven witnesses (rank, xp, badges, power, gear, team, events) and prints an `EVENTS` block (live/upcoming windows + strategy pointer per event), then the gates with hero examples, then a leverage-ordered action list: pool purchases → apply stock books → farm by power per energy → gear → unlocks. Zero pricing logic of its own. `--top N`, `--json` |
 | `machine_hunt.py` | **Where do Mechanical enemies die cheapest?** Event view ranking campaign nodes by event **points** per energy (3 pts per Standard/Mirror kill, 5 per Elite — gameconfig trackers; `Pt/E`/`Pts` columns, `pt_per_e`/`pts` in `--json`), with your live attempt count per node (`Att` — exhausted nodes hidden, `--all` shows them), plus a header line with the live event window (`--json` → `event_ends`). `--items` = balance option: flag nodes that also drop items your next rank-ups need, ending with a totals footer (need per distinct item + top heroes). `campaign` filter, `--top`, `--json`, `--selftest`. `--json` also carries `events` (live/upcoming schedule) — that is what `next_step.py` reads as its advisory `event` witness |
+| `lres_report.py` | **The "ancestors are watching" LRES** (unlock Uthar): per lane (alpha/beta/gamma) the next uncleared battle, best owned specialist team for its objectives, the **power wall** (first battle your strongest allowed 5 can't out-power) plus a 6-battle ladder with ratios and full-clear points, mission farm targets, and the event window with chest/engram outlook. `lane` substring (omit = all three), `--json`, `--selftest`; exposed as MCP tool `lres_report`. |
 | `tacticus-drop-rates.json` | Economy config: drop rates by tier × rarity, energy costs, regen + the `extra` daily sources (ad/crate/blackstone → 638/day behind `Days`) + the `spender` verdict-ceiling profiles, mercy notes, tunable `rank_item_rarity` (used by `--estimate`) |
 | `research/` | **Git-ignored, ~74 MB** — offline copies of the third-party sources used for game-mechanics research (planner repos, raw game config, wiki scrapes). See `research/README.md` |
 | `tacticus-shop-prices.json` | Daily Deals / shop prices (energy refill ladder, per-rarity singles, chests, requisition + EV, coins, `typical_single_bs` ladder behind the `SHOP` column, `blackstone_income` = subscription + promo-code estimates) with `fair_price_floor_bs` markup vs farming. For the buy-vs-farm angle. |
-| `tacticus_mcp.py` | Thin MCP adapter (stdio, stdlib only) exposing `rank_up_report`, `item_value`, `xp_gate`, `gear_report`, `ability_gate`, `power_delta`, `team_roster`, `machine_hunt`, `next_step`, `player_refresh` as agent tools + the two config files as resources. Marshalling only — runs the CLIs and returns their `--json` verbatim. Registered in `opencode.json`. |
+| `tacticus_mcp.py` | Thin MCP adapter (stdio, stdlib only) exposing `rank_up_report`, `item_value`, `xp_gate`, `gear_report`, `ability_gate`, `power_delta`, `team_roster`, `machine_hunt`, `lres_report`, `next_step`, `player_refresh` as agent tools + the two config files as resources. Marshalling only — runs the CLIs and returns their `--json` verbatim. Registered in `opencode.json`. |
 | `make_bundle.py` | Packs the browser bundle (`dist/bundle.tar.gz`, gitignored): code + configs + planner data, **no roster/key**. |
 | `browser_harness.py` | Pyodide runner: extracts the bundle, shims the two `subprocess` call sites in-process. Self-check: `python3 browser_harness.py` (byte-equal vs real subprocess). |
-| `web/index.html` | Browser front end: Pyodide in-tab, brief via `next_step`, chat via the Worker proxy. Key stays in the tab (sessionStorage) and only transits the proxy to the game API. Chat replies render as HTML — markdown tables become sortable tables (DataTables + jQuery, jsDelivr). The key field links to the key generator (`https://api.tacticusgame.com/`), and a static table lists what this page ships (gates, farm incl. `+power`, purchases, events, chat); a `Hunt nodes` button runs `machine_hunt --items` in-browser. Layout comes from water.css — dark by default, header button toggles light/dark. |
+| `web/index.html` | Browser front end: Pyodide in-tab, brief via `next_step`, chat via the Worker proxy. Key stays in the tab (sessionStorage) and only transits the proxy to the game API. Chat replies render as HTML — markdown tables become sortable tables (DataTables + jQuery, jsDelivr). The key field links to the key generator (`https://api.tacticusgame.com/`), and a static table lists what this page ships (gates, farm incl. `+power`, purchases, events, chat); a `Hunt nodes` button runs `machine_hunt --items` in-browser, an `Uthar event` button runs `lres_report`. Layout comes from water.css — dark by default, header button toggles light/dark. |
 | `worker/worker.js` | Cloudflare Worker: `/player` CORS pass-through (key never stored), `/chat` LLM relay over the precomputed brief. |
 | `.github/workflows/pages.yml` | Deploys the site to GitHub Pages (re-fetches gitignored `research/`, pinned); a fast `test` job (`py_compile` + MCP smoke + `check_page.py`) gates the build, actions are SHA-pinned. |
 | `.tacticus_api_key` | API key (`chmod 600`), read by `gen_swagger.py` |
@@ -966,6 +967,10 @@ python3 machine_hunt.py --items          # balance: nodes that also drop your ne
 python3 machine_hunt.py --all            # include nodes with 0 attempts left
 python3 machine_hunt.py indomitus-elite  # one campaign (substring)
 python3 machine_hunt.py --json --top 5   # machine-readable
+
+# Uthar LRES ("ancestors are watching"): teams, power walls, mission farms
+python3 lres_report.py                   # all three lanes (alpha/beta/gamma)
+python3 lres_report.py beta --json       # one lane, machine-readable
 ```
 
 ```text
@@ -1006,6 +1011,7 @@ any MCP client:
 | tool `power_delta` | `power_delta.py --json` (pass `query` for one hero's formula breakdown) |
 | tool `team_roster` | `team_roster.py --json` (pass `query` for one comp id fragment: `multi`, `zkar`) |
 | tool `machine_hunt` | `machine_hunt.py --json` (pass `campaign` substring, `top`, `all`, `items`) |
+| tool `lres_report` | `lres_report.py --json` (pass `lane` = alpha/beta/gamma) |
 | tool `next_step` | `next_step.py --json` (pass `top` for a longer farm list; ~1.1 s run) |
 | tool `player_refresh` | `update_player.py` — refreshes the local cache only; the API is read-only |
 | resource `tacticus://config/drop-rates` | `tacticus-drop-rates.json` |
@@ -1024,6 +1030,7 @@ tacticus -- python3 /home/user/workspace/tacticus/tacticus_mcp.py`; check with
 `tools.tacticus.xp_gate(...)` / `tools.tacticus.gear_report(...)` /
 `tools.tacticus.ability_gate(...)` / `tools.tacticus.power_delta(...)` /
 `tools.tacticus.team_roster(...)` / `tools.tacticus.machine_hunt(...)` /
+`tools.tacticus.lres_report(...)` /
 `tools.tacticus.next_step(...)` /
 `tools.tacticus.player_refresh(...)`, and the
 result already arrives **parsed** — read `.rows` / `.ratio` directly instead of

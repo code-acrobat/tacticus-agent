@@ -32,7 +32,7 @@ import sys
 
 BASE = pathlib.Path(__file__).resolve().parent
 SERVER_NAME = "tacticus"
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 PROTOCOL_FALLBACK = "2024-11-05"   # classic initialize handshake
 RUN_TIMEOUT = 120                  # seconds; the report itself runs in ~0.05 s
 
@@ -283,6 +283,28 @@ TOOLS = [
         },
     },
     {
+        "name": "lres_report",
+        "title": "Uthar LRES: teams, power walls, mission farms",
+        "description": (
+            "The 'ancestors are watching' Legendary Release Event (unlock "
+            "Uthar): per lane (alpha/beta/gamma) the next uncleared battle, "
+            "its objectives, the best owned specialist team (locked heroes "
+            "and wrong alliance excluded), power walls (first battle your "
+            "strongest allowed 5 cannot beat) with the next-6 ladder ratios, "
+            "the event window, points/engram/shard outlook, and the regular/"
+            "premium mission kill-farm nodes. lane filters by substring "
+            "('beta'). Returns {schema_version, meta, lanes, missions}."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "lane": {"type": "string",
+                         "description": "alpha, beta or gamma (substring)"},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "next_step",
         "title": "Assembler: where am I blocked, what next",
         "description": (
@@ -371,7 +393,10 @@ INSTRUCTIONS = (
     "when the question spans gates. team_roster checks the curated "
     "guild-raid comps (fieldability only, no synergy score exists in "
     "config). machine_hunt ranks campaign nodes by event points per energy "
-    "with your attempt counts - the 'where do I hunt next?' answer."
+    "with your attempt counts - the 'where do I hunt next?' answer. "
+    "lres_report covers the live Legendary Release Event: per-lane "
+    "specialist teams, power walls and mission farms; its event window is "
+    "derived from the legendary-event recurrence and listed by next_step."
 )
 
 
@@ -446,6 +471,12 @@ def build_argv(name, args):
             argv.append("--all")
         if args.get("top"):
             argv += ["--top", str(int(args["top"]))]
+        return argv
+    if name == "lres_report":
+        argv = [sys.executable, str(BASE / "lres_report.py")]
+        if args.get("lane"):
+            argv.append(str(args["lane"]))
+        argv.append("--json")
         return argv
     if name == "next_step":
         argv = [sys.executable, str(BASE / "next_step.py")]
