@@ -176,21 +176,29 @@ the MCP adapter below — should check `schema_version` before reading `rows`.
 With `--energy --json` the payload also carries `contention` (see
 "Shared-bank contention" below).
 
-The report covers the **106 characters**. The 11 machines of war are excluded
-by `MOW_IDS`: they have no rank grid at all (`PlayerMowRecord` has no `Rank`
-property — they progress through ability levels instead, which use the same
-upgrade items but a different ladder). They are listed in `research/README.md`.
+The report covers the **101 characters**. Two exclusions:
+
+* the 11 machines of war by `MOW_IDS`: they have no rank grid at all
+  (`PlayerMowRecord` has no `Rank` property — they progress through ability
+  levels instead, which use the same upgrade items but a different ladder).
+  They are listed in `research/README.md`.
+* heroes at their **rarity rank cap** — `heroProgressionSteps[].maxRank` in
+  `research/datamine/gameconfig142.json` (Rare 9 = Silver I, Epic 12 = Gold I,
+  Legendary 17 = Diamond III; today: Titus, Sibyll, Tan Gi'da, Sarquael,
+  Ramus). The planner ships a grid for every rank of every hero, but the game
+  refuses promotion past the cap until ascension, so advising it would fight
+  the status quo. Soft requirement: without `research/` the filter is skipped.
 
 ```
-Rank-up proximity - 106 characters
+Rank-up proximity - 101 characters
 Grid: 6 slots per rank-up; 'Missing' = slots still empty.
 Excluded 11 machines of war - they have no rank grid (they level abilities instead; see research/README.md).
+Excluded 5 at their rarity rank cap - no next rank until ascension (Titus, Sibyll, Tan Gi'da, Sarquael, Ramus).
 
-#  Character  Faction      Current      Next          Grid  Missing
--  ---------  -----------  -----------  ------------  ----  -------
-1  Azrael     DarkAngels   Diamond III  Adamantine I  5/6         1
-2  Imospekh   Necrons      Diamond II   Diamond III   5/6         1
-3  Archimatos BlackLegion  Gold II      Gold III      5/6         1
+#  Character  Faction      Current     Next         Grid  Missing
+-  ---------  -----------  ----------  -----------  ----  -------
+1  Gulgortz   Orks         Diamond II  Diamond III  5/6         1
+2  Imospekh   Necrons      Diamond II  Diamond III  5/6         1
 ...
 ```
 

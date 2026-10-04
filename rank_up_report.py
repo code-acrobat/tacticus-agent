@@ -43,6 +43,12 @@ Plus one derived from them:
 The 11 machines of war are excluded: they have no rank grid at all (they
 progress by ability levels instead - see research/README.md).
 
+Heroes at their rarity rank cap are excluded too: the planner ships a grid
+for every rank of every hero, but the game refuses promotion past
+heroProgressionSteps[].maxRank for the hero's rarity (Rare 9 = Silver I,
+Epic 12 = Gold I, Legendary 17 = Diamond III). Soft requirement on
+research/datamine/gameconfig142.json - without it the filter is skipped.
+
 Usage:
     python3 rank_up_report.py
     python3 rank_up_report.py --top 15
@@ -67,6 +73,7 @@ import energy_cost
 BASE = pathlib.Path(__file__).resolve().parent
 DEFAULT_DATA = BASE / "tacticus-player.json"
 DEFAULT_RATES = BASE / "tacticus-drop-rates.json"
+GAMECONFIG = BASE / "research/datamine/gameconfig142.json"
 
 GRID_SLOTS = 6
 TIERS = ["Stone", "Iron", "Bronze", "Silver", "Gold", "Diamond", "Adamantine"]
@@ -110,6 +117,25 @@ def rank_name(rank):
     if 0 <= rank // 3 < len(TIERS):
         return f"{TIERS[rank // 3]} {ROMAN[rank % 3]}"
     return f"rank {rank}"  # beyond the tiers we know about
+
+
+def rarity_caps():
+    """{progressionIndex: maxRank} from gameconfig, {} without research/.
+
+    A hero at rank >= maxRank has no next rank until ascension, even though
+    the planner catalog still ships a grid for it."""
+    if not GAMECONFIG.exists():
+        return {}
+    try:
+        steps = json.loads(GAMECONFIG.read_text())["clientGameConfig"][
+            "units"]["heroProgressionSteps"]
+    except json.JSONDecodeError as error:
+        sys.exit(f"error: {GAMECONFIG} is not valid JSON: {error}")
+    except KeyError as error:
+        sys.exit(f"error: {GAMECONFIG} is missing {error} - the config layout "
+                 "changed; update rank_up_report.py")
+    return {i: s["maxRank"] for i, s in enumerate(steps)
+            if isinstance(s.get("maxRank"), int)}
 
 
 def analyse(unit):
@@ -423,6 +449,16 @@ def main():
     all_units = player["units"]
     mows = [u for u in all_units if u["id"] in MOW_IDS]
     raw_units = [u for u in all_units if u["id"] not in MOW_IDS]
+
+    caps = rarity_caps()
+
+    def at_cap(u):
+        pi = u.get("progressionIndex")
+        max_rank = caps.get(pi) if isinstance(pi, int) else None
+        return max_rank is not None and u["rank"] >= max_rank
+
+    capped = [u for u in raw_units if at_cap(u)]
+    raw_units = [u for u in raw_units if not at_cap(u)]
     rows = [analyse(u) for u in raw_units]
 
     rates = None
@@ -492,6 +528,9 @@ def main():
     if mows:
         print(f"Excluded {len(mows)} machines of war - they have no rank grid "
               f"(they level abilities instead; see research/README.md).")
+    if capped:
+        print(f"Excluded {len(capped)} at their rarity rank cap - no next rank "
+              f"until ascension ({', '.join(u['name'] for u in capped)}).")
     print(f"Sort: {sort_label} first.")
     if args.top and len(rows) < len(all_rows):
         print(f"Showing the {len(rows)} closest of {len(all_rows)} (summary covers all).")
