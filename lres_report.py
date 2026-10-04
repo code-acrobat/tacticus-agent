@@ -293,6 +293,7 @@ def analyse(lane_filter=None):
         best5 = sorted(pool, key=lambda i: -PW.get(i, 0))[:5]
         best_pw = sum(PW.get(i, 0) for i in best5)
         wall = next((b["number"] for b in battles if b["power"] > best_pw), None)
+        obj_wall = next((b["number"] for b in battles if b["power"] > team_pw), None)
         ladder = []
         for i, b in enumerate(battles[nxt:nxt + 6], start=nxt):
             ratio = best_pw / b["power"]
@@ -318,7 +319,8 @@ def analyse(lane_filter=None):
             "power": {"obj_team": team_pw,
                       "best5": [{"id": i, "name": units[i]["name"],
                                  "power": PW.get(i, 0)} for i in best5],
-                      "best5_total": best_pw, "wall": wall},
+                      "best5_total": best_pw, "wall": wall,
+                      "obj_wall": obj_wall},
             "ladder": ladder,
         })
 
@@ -368,7 +370,8 @@ def report(d):
               f"(disallowed: {', '.join(L['disallowed']) or 'none'})")
         for o in L["objectives"]:
             print(f"   +{o['score']:>3}  {o['type']} {o['target']}")
-        print("   BEST OWNED TEAM (sum of objective pts):")
+        print(f"   LINEUP for every battle in this lane (objectives identical "
+              f"#1-17; #18 only raises Acing, not a filter):")
         for t in L["team"]:
             print(f"      {t['pts']:>3}  {t['name']:<22} rank {t['rank']:>2} "
                   f"star {t['stars']}  [{', '.join(t['covers'])}]")
@@ -378,13 +381,18 @@ def report(d):
         for wmsg in L["warnings"]:
             print(f"      ! {wmsg}")
         pw = L["power"]
-        print(f"   POWER: objective team {pw['obj_team']:,} | strongest allowed 5 "
-              f"{pw['best5_total']:,} ({', '.join(t['name'] for t in pw['best5'])})")
-        print(f"   wall: battle {pw['wall'] or '>18'} is the first tier above your "
-              f"strongest allowed 5")
+        print(f"   POWER: lineup {pw['obj_team']:,} | strongest allowed 5 (ceiling, "
+              f"ignores specialisation) {pw['best5_total']:,} "
+              f"({', '.join(t['name'] for t in pw['best5'])})")
+        print(f"   lineup wall: battle {pw['obj_wall'] or '>18'} first exceeds this "
+              f"lineup - from there field the ceiling five (per-hero objective "
+              f"points still bank)")
+        print(f"   ceiling wall: battle {pw['wall'] or '>18'} is the first tier "
+              f"above your strongest allowed 5")
         for r in L["ladder"]:
-            print(f"      #{r['number']:>2} need {r['need']:>10,}  {r['ratio']:5.1f}x  "
-                  f"{r['mark']:<8} | obj-team {r['obj_ratio']:4.1f}x {r['obj_mark']:<5} "
+            print(f"      #{r['number']:>2} need {r['need']:>10,}  "
+                  f"lineup {r['obj_ratio']:4.1f}x {r['obj_mark']:<6} | "
+                  f"ceiling {r['ratio']:5.1f}x {r['mark']:<8} "
                   f"full-clear ~{r['full_clear']:,} pts")
 
     print("\n" + "=" * 78)
