@@ -32,7 +32,7 @@ import sys
 
 BASE = pathlib.Path(__file__).resolve().parent
 SERVER_NAME = "tacticus"
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 PROTOCOL_FALLBACK = "2024-11-05"   # classic initialize handshake
 RUN_TIMEOUT = 120                  # seconds; the report itself runs in ~0.05 s
 
@@ -335,6 +335,31 @@ TOOLS = [
         },
     },
     {
+        "name": "shard_source",
+        "title": "Where to get shards for a character",
+        "description": (
+            "Where do I get shards for character X? Sources for one hero "
+            "from the game config: campaign nodes that drop them (with your "
+            "attempt counts), shop offers including rotating event shops "
+            "(qty/cost/rotation/locks), requisition summoning-portal odds "
+            "(expected shards per pull and full-unit odds; worst case), the "
+            "post-unlock hero quest chain, webstore bundles and past release "
+            "banners. No unlock-shard threshold exists in config, so this "
+            "lists sources only. Returns {schema_version, meta, campaign, "
+            "shops, requisition, quests, iap, banners, verdict}."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string",
+                          "description": "character NAME or id (partial ok, "
+                                         "_ = space)"},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "player_refresh",
         "title": "Refresh the roster snapshot",
         "description": (
@@ -398,7 +423,9 @@ INSTRUCTIONS = (
     "with your attempt counts - the 'where do I hunt next?' answer. "
     "lres_report covers the live Legendary Release Event: per-lane "
     "specialist teams, power walls and mission farms; its event window is "
-    "derived from the legendary-event recurrence and listed by next_step."
+    "derived from the legendary-event recurrence and listed by next_step. "
+    "shard_source answers 'where do I get shards for X?' - campaign, "
+    "shops, requisition odds; worst case is the requisition pool."
 )
 
 
@@ -485,6 +512,11 @@ def build_argv(name, args):
         if args.get("top"):
             argv += ["--top", str(int(args["top"]))]
         argv.append("--json")
+        return argv
+    if name == "shard_source":
+        argv = [sys.executable, str(BASE / "shard_source.py"), "--json"]
+        if args.get("query"):
+            argv.append(str(args["query"]))
         return argv
     if name == "player_refresh":
         argv = [sys.executable, str(BASE / "update_player.py")]

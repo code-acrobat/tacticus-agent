@@ -97,10 +97,11 @@ matching its own command line.
 | `next_step.py` | **The assembler** — "where am I blocked, what should I do next?" in one screen. Convenes the seven witnesses (rank, xp, badges, power, gear, team, events) and prints an `EVENTS` block (live/upcoming windows + strategy pointer per event), then the gates with hero examples, then a leverage-ordered action list: pool purchases → apply stock books → farm by power per energy → gear → unlocks. Zero pricing logic of its own. `--top N`, `--json` |
 | `machine_hunt.py` | **Where do Mechanical enemies die cheapest?** Event view ranking campaign nodes by event **points** per energy (3 pts per Standard/Mirror kill, 5 per Elite — gameconfig trackers; `Pt/E`/`Pts` columns, `pt_per_e`/`pts` in `--json`), with your live attempt count per node (`Att` — exhausted nodes hidden, `--all` shows them), plus a header line with the live event window (`--json` → `event_ends`). `--items` = balance option: flag nodes that also drop items your next rank-ups need, ending with a totals footer (need per distinct item + top heroes). `campaign` filter, `--top`, `--json`, `--selftest`. `--json` also carries `events` (live/upcoming schedule) — that is what `next_step.py` reads as its advisory `event` witness |
 | `lres_report.py` | **The "ancestors are watching" LRES** (unlock Uthar): per lane (alpha/beta/gamma) the next uncleared battle, best owned specialist team for its objectives, the per-lane **lineup** (one five fits all 18 battles — objectives identical for #1-17, #18 only raises Acing), its lineup wall and the ceiling **power wall** (first battle your strongest allowed 5 can't out-power), plus a per-specialisation pool of every owned coverer (alternatives, * = in lineup), a 6-battle ladder printing lineup/ceiling ratios with full-clear points, mission farm targets, and the event window with chest/engram outlook. `lane` substring (omit = all three), `--json`, `--selftest`; exposed as MCP tool `lres_report`. |
+| `shard_source.py` | **Where do I get shards for this character?** campaign nodes that drop them (with your attempts left), every shop offer (qty, cost, rotation, locks, event flag), requisition summoning-portal odds (expected shards/pull + full-unit odds, 300 BS a pull), the post-unlock hero quest chain, the webstore bundle and past release banners. Name or id (partial ok), `--json`; exposed as MCP tool `shard_source`. |
 | `tacticus-drop-rates.json` | Economy config: drop rates by tier × rarity, energy costs, regen + the `extra` daily sources (ad/crate/blackstone → 638/day behind `Days`) + the `spender` verdict-ceiling profiles, mercy notes, tunable `rank_item_rarity` (used by `--estimate`) |
 | `research/` | **Git-ignored, ~74 MB** — offline copies of the third-party sources used for game-mechanics research (planner repos, raw game config, wiki scrapes). See `research/README.md` |
 | `tacticus-shop-prices.json` | Daily Deals / shop prices (energy refill ladder, per-rarity singles, chests, requisition + EV, coins, `typical_single_bs` ladder behind the `SHOP` column, `blackstone_income` = subscription + promo-code estimates) with `fair_price_floor_bs` markup vs farming. For the buy-vs-farm angle. |
-| `tacticus_mcp.py` | Thin MCP adapter (stdio, stdlib only) exposing `rank_up_report`, `item_value`, `xp_gate`, `gear_report`, `ability_gate`, `power_delta`, `team_roster`, `machine_hunt`, `lres_report`, `next_step`, `player_refresh` as agent tools + the two config files as resources. Marshalling only — runs the CLIs and returns their `--json` verbatim. Registered in `opencode.json`. |
+| `tacticus_mcp.py` | Thin MCP adapter (stdio, stdlib only) exposing `rank_up_report`, `item_value`, `xp_gate`, `gear_report`, `ability_gate`, `power_delta`, `team_roster`, `machine_hunt`, `lres_report`, `shard_source`, `next_step`, `player_refresh` as agent tools + the two config files as resources. Marshalling only — runs the CLIs and returns their `--json` verbatim. Registered in `opencode.json`. |
 | `make_bundle.py` | Packs the browser bundle (`dist/bundle.tar.gz`, gitignored): code + configs + planner data, **no roster/key**. |
 | `browser_harness.py` | Pyodide runner: extracts the bundle, shims the two `subprocess` call sites in-process. Self-check: `python3 browser_harness.py` (byte-equal vs real subprocess). |
 | `web/index.html` | Browser front end: Pyodide in-tab, brief via `next_step`, chat via the Worker proxy. Key stays in the tab (sessionStorage) and only transits the proxy to the game API. Chat replies render as HTML — markdown tables become sortable tables (DataTables + jQuery, jsDelivr). The key field links to the key generator (`https://api.tacticusgame.com/`), and a static table lists what this page ships (gates, farm incl. `+power`, purchases, events, chat); a `Hunt nodes` button runs `machine_hunt --items` in-browser, an `Uthar event` button runs `lres_report`. Layout comes from water.css — dark by default, header button toggles light/dark. |
@@ -979,6 +980,10 @@ python3 machine_hunt.py --json --top 5   # machine-readable
 # Uthar LRES ("ancestors are watching"): teams, power walls, mission farms
 python3 lres_report.py                   # all three lanes (alpha/beta/gamma)
 python3 lres_report.py beta --json       # one lane, machine-readable
+
+# shard source: where do I get shards for this character?
+python3 shard_source.py hascule           # campaign / shops / requisition / quests
+python3 shard_source.py hascule --json    # machine-readable
 ```
 
 ```text
@@ -1003,6 +1008,37 @@ distinct leaves shown, per item and per top hero.
   `rank_up_report --energy --json` (next rung only). Deliberately not an
   MCP tool and not a `next_step` witness — an event view, not a roster gate.
 
+## Shard source lookup
+
+`shard_source.py` answers the other half of roster advice: not "how do I rank
+this hero up" but "how do I even get this hero". It takes a character name or
+id and prints every source in the game config, so a guild member can be told
+where their next unlock comes from without guessing.
+
+```bash
+python3 shard_source.py hascule
+python3 shard_source.py necroWarden          # a hero that does drop in campaign
+python3 shard_source.py hascule --json
+```
+
+Sections: **campaign** (nodes granting `shards_<id>`, with the stamina cost and
+your attempts-left per node), **shops** (every merchant product, qty + cost,
+`daily`/weekly rotation, `maxPurchases` and the lock id — rotating event shops
+flagged), **requisition** (the summoning-portal drop chain walked for expected
+shards per 300 BS pull plus full-unit odds, the worst-case source), **hero
+quests** (the `hero_<id>_*` chain, +10/+15/+25), **webstore** bundle and
+**banners**, then a one-line verdict per actionable source.
+
+The motivating case is a hero with no campaign source at all — e.g. Hascule
+(Emperors Children): no node drops him, so the answer is the shops (elder shop 5
+for 20 elder currency daily, plus dated rotating event-shop offers), the
+post-unlock quest chain, the 1599-cent bundle, or requisition at ~0.064 shards
+a pull (~1 in 1,493 for a whole unit).
+
+There is **no unlock-shard threshold anywhere in the game config**, so the tool
+lists sources and never claims what an unlock costs. Deliberately not a
+`next_step` witness — a per-character lookup, like `item_value`.
+
 ## MCP adapter (AI agents)
 
 `tacticus_mcp.py` is a thin Model Context Protocol server (stdio, Python stdlib
@@ -1020,6 +1056,7 @@ any MCP client:
 | tool `team_roster` | `team_roster.py --json` (pass `query` for one comp id fragment: `multi`, `zkar`) |
 | tool `machine_hunt` | `machine_hunt.py --json` (pass `campaign` substring, `top`, `all`, `items`) |
 | tool `lres_report` | `lres_report.py --json` (pass `lane` = alpha/beta/gamma) |
+| tool `shard_source` | `shard_source.py --json` (pass `query` = character name or id) |
 | tool `next_step` | `next_step.py --json` (pass `top` for a longer farm list; ~1.1 s run) |
 | tool `player_refresh` | `update_player.py` — refreshes the local cache only; the API is read-only |
 | resource `tacticus://config/drop-rates` | `tacticus-drop-rates.json` |
@@ -1039,6 +1076,7 @@ tacticus -- python3 /home/user/workspace/tacticus/tacticus_mcp.py`; check with
 `tools.tacticus.ability_gate(...)` / `tools.tacticus.power_delta(...)` /
 `tools.tacticus.team_roster(...)` / `tools.tacticus.machine_hunt(...)` /
 `tools.tacticus.lres_report(...)` /
+`tools.tacticus.shard_source(...)` /
 `tools.tacticus.next_step(...)` /
 `tools.tacticus.player_refresh(...)`, and the
 result already arrives **parsed** — read `.rows` / `.ratio` directly instead of
