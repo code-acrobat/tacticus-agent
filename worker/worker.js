@@ -59,7 +59,10 @@ export default {
         'also echoed in the NEXT: chain. Lines like "python3 ..." are terminal ' +
         'hints for the CLI, never instructions for the user: on this page those ' +
         'tools have already run, and machine_hunt --items is available from the ' +
-        'page "Hunt nodes" button, so point there instead of a shell.\n\n' +
+        'page "Hunt nodes" button, so point there instead of a shell. Shard ' +
+        'sources for any character (owned or not) are available from the page ' +
+        '"Shard sources" button, so send the user there instead of guessing ' +
+        'shop or campaign odds.\n\n' +
         '--- BRIEF ---\n' + String(brief).slice(0, 40000);
       const r = await fetch(
         (env.LLM_BASE_URL || 'https://api.openai.com/v1') + '/chat/completions',

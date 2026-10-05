@@ -50,6 +50,9 @@ for marker in (
     "machine_hunt",        # its CLI reference
     'id="lres"',           # Uthar event button
     "lres_report",         # its CLI reference
+    'id="shards"',         # Shard sources button
+    'id="shardq"',         # its character input
+    "shard_source",        # its CLI reference
     'id="theme"',          # light/dark toggle
     "water.css@2/out/dark.min.css",
     "What this page ships",
