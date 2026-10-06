@@ -47,7 +47,7 @@ check(not missing, "markup missing ids: " + ", ".join(missing))
 for marker in (
     'id="tools"',          # what-this-page-ships table
     'id="hunt"',           # Hunt nodes button
-    "machine_hunt",        # its CLI reference
+    "home_screen_event",  # its CLI reference
     'id="lres"',           # Uthar event button
     "lres_report",         # its CLI reference
     'id="shards"',         # Shard sources button

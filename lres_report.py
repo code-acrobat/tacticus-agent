@@ -7,7 +7,7 @@ this prints the next uncleared battle, the best owned specialist team, and the
 power ladder - your strongest allowed 5 vs each tier's difficulty, so you walk
 up to the wall instead of trying it early or farming a low-point tier. Also
 prints the event window (derived from the planner's Fixed legendary-event
-recurrence via machine_hunt.event_list) and the machine-hunt overlap (beta
+recurrence via home_screen_event.event_list) and the machine-hunt overlap (beta
 fights machines while that event is live).
 
 Usage:  python3 lres_report.py [alpha|beta|gamma] [--json] [--selftest]
@@ -132,7 +132,7 @@ def allowed(uid, u, disallowed, track, owned):
 def event_window():
     """The live/upcoming legendary-event window [{id,start,end,live}], or None."""
     try:
-        from machine_hunt import event_list
+        from home_screen_event import event_list
         return next((e for e in event_list(datetime.now(timezone.utc))
                      if e["id"] == "legendary-event"), None)
     except Exception:
@@ -424,7 +424,7 @@ def report(d):
         print(f"  {mis['need']:>4} {mis['label']:<12} -> "
               f"{top or 'no attempts left (kills also count in event battles)'}")
     print("\nMACHINE-HUNT OVERLAP: " + d["meta"]["machine_hunt_overlap"])
-    print("for the live machine-hunt window, see next_step EVENTS / machine_hunt.py")
+    print("for the live machine-hunt window, see next_step EVENTS / home_screen_event.py")
 
 
 def main(argv=None):

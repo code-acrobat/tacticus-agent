@@ -60,8 +60,8 @@ the <a href="https://github.com/code-acrobat/tacticus-agent" rel="noopener">sour
 <div id="status"></div>
 <pre id="brief" hidden></pre>
 <div id="huntrow">
-  <button id="hunt" type="button" disabled>Hunt nodes ⚔</button>
-  <span class="note">runs <code>machine_hunt --items</code> in your browser — Mechanical nodes ranked by event points per energy</span>
+  <button id="hunt" type="button" disabled>Event nodes ⚔</button>
+  <span class="note">runs <code>home_screen_event --items</code> in your browser — every scoring node ranked by event points per energy</span>
   <button id="lres" type="button" disabled>Uthar event ⚔</button>
   <span class="note">runs <code>lres_report</code> in your browser — next-battle teams, power walls, mission farms</span>
 </div>
@@ -121,16 +121,16 @@ $('theme').addEventListener('click', () => {
   applyTheme();
 });
 
-/* machine_hunt --items runs in the same Pyodide runtime as the brief, so the
+/* home_screen_event --items runs in the same Pyodide runtime as the brief, so the
    python3 hint in the EVENTS block is runnable right here */
 let huntOn = false;
 $('hunt').addEventListener('click', async () => {
-  if (huntOn) { $('huntout').hidden = true; $('hunt').textContent = 'Hunt nodes ⚔'; huntOn = false; return; }
+  if (huntOn) { $('huntout').hidden = true; $('hunt').textContent = 'Event nodes ⚔'; huntOn = false; return; }
   if (busy || !booted) return;
   busy = true; $('hunt').disabled = true;
   try {
-    status('ranking hunt nodes (machine_hunt --items)…');
-    $('huntout').textContent = await py.runPythonAsync('str(_h.run_cli("/tacticus/machine_hunt.py", ["--items"]).stdout)');
+    status('ranking hunt nodes (home_screen_event --items)…');
+    $('huntout').textContent = await py.runPythonAsync('str(_h.run_cli("/tacticus/home_screen_event.py", ["--items"]).stdout)');
     $('huntout').hidden = false;
     $('hunt').textContent = 'Hide hunt nodes';
     huntOn = true;

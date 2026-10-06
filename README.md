@@ -18,7 +18,7 @@ read-only API.
 1. Generate a key at <https://api.tacticusgame.com/> (Player scope).
 2. Open the site, paste it, press **Load account** — the first visit fetches
    Pyodide from the CDN, so give it a few seconds.
-3. Read the brief, press **Hunt nodes ⚔** for the mechanical-hunt rankings,
+3. Read the brief, press **Event nodes ⚔** for the home-screen kill-event rankings,
    and ask the chat about the brief. Theme toggle top-right; the key lives in
    `sessionStorage` only.
 
@@ -95,16 +95,16 @@ matching its own command line.
 | `power_delta.py` | **Power bought by the next rank-up** (planner's V1 formula as a proxy — the in-game one is unpublished). `Power` now, `+Rung` = power from filling the next 6-cell grid, `+Hp/+Dmg/+Arm` = the flat stat grants, `+END` = ladder finished (Calgar). Detail view shows the formula with this hero's numbers. Query = one hero detail, `--json`. Correlate with `rank_up_report --energy` outside the tool (power per energy) |
 | `team_roster.py` | **Which curated team comps can you field?** The 7 community guild-raid comps (terminus-maximus + cognitae, via the planner) checked against your roster: signature / core / flex / MoW ownership, a 5-hero pool count and a `fieldable` / `no signature` / `thin N/5` verdict. Deliberately computes **no synergy score** (no combo key exists in config). Query = one comp in detail, `--json` |
 | `next_step.py` | **The assembler** — "where am I blocked, what should I do next?" in one screen. Convenes the seven witnesses (rank, xp, badges, power, gear, team, events) and prints an `EVENTS` block (live/upcoming windows + strategy pointer per event), then the gates with hero examples, then a leverage-ordered action list: pool purchases → apply stock books → farm by power per energy → gear → unlocks. Zero pricing logic of its own. `--top N`, `--json` |
-| `machine_hunt.py` | **Where do Mechanical enemies die cheapest?** Event view ranking campaign nodes by event **points** per energy (3 pts per Standard/Mirror kill, 5 per Elite — gameconfig trackers; `Pt/E`/`Pts` columns, `pt_per_e`/`pts` in `--json`), with your live attempt count per node (`Att` — exhausted nodes hidden, `--all` shows them), plus a header line with the live event window (`--json` → `event_ends`). `--items` = balance option: flag nodes that also drop items your next rank-ups need, ending with a totals footer (need per distinct item + top heroes). `campaign` filter, `--top`, `--json`, `--selftest`. `--json` also carries `events` (live/upcoming schedule) — that is what `next_step.py` reads as its advisory `event` witness |
+| `home_screen_event.py` | **Where do enemies die cheapest during a home-screen kill event?** **Two events, one report** — `--event {machine-hunt,training-rush,auto}` (default: whichever is live). `machine-hunt` scores `Mechanical`-trait kills only; `training-rush` scores every non-`Summon`/non-`Steppable` kill **and** pays hero XP × 2.5 (Common) .. 5 (Mythic) by the hero's rarity. Both pay 3 pts per Standard/Mirror kill and 5 per Elite, so `Pt/E` (the reward rate either way) is `Pts`/`E` — `Pt/E`/`Pts`/`pt_per_e`/`pts` in `--json`. Tracker rates, XP multipliers and the leftover-points gold rate are regex-sliced from the minified `research/misc/bundle.js` (unquoted JS keys ⇒ no `json.loads`); the reward ladder (`--track`) comes from gameconfig `loot.tieredProgressRewards` keyed by the per-event `progress` id, and per-node **battle XP** (`XP/E`, pre-multiplier) from gameconfig `battles.campaigns` joined on `f"{nodeNumber:02d}"` — the event campaigns have no gameconfig twin, so their XP prints `?`. `--xp-needed` re-ranks on `XP/E` (unknown-XP rows sink) and lists XP-blocked heroes via `xp_gate.py --only blocked --json` (`gap_xp`). Live attempt count per node (`Att` — exhausted nodes hidden, `--all` shows them) plus a header with the live event window (`--json` → `event_ends`). `--items` = balance option: flag nodes that also drop items your next rank-ups need, ending with a totals footer (need per distinct item + top heroes). `campaign` filter, `--top`, `--json`, `--selftest`. `--json` also carries `events` (live/upcoming schedule) — that is what `next_step.py` reads as its advisory `event` witness |
 | `lres_report.py` | **The "ancestors are watching" LRES** (unlock Uthar): per lane (alpha/beta/gamma) the next uncleared battle, best owned specialist team for its objectives, the per-lane **lineup** (one five fits all 18 battles — objectives identical for #1-17, #18 only raises Acing), its lineup wall and the ceiling **power wall** (first battle your strongest allowed 5 can't out-power), plus a per-specialisation pool of every owned coverer (alternatives, * = in lineup), a 6-battle ladder printing lineup/ceiling ratios with full-clear points, mission farm targets, and the event window with chest/engram outlook. `lane` substring (omit = all three), `--json`, `--selftest`; exposed as MCP tool `lres_report`. |
 | `shard_source.py` | **Where do I get shards for this character?** campaign nodes that drop them (with your attempts left), every shop offer (qty, cost, rotation, locks, event flag), requisition summoning-portal odds (expected shards/pull + full-unit odds, 300 BS a pull), the post-unlock hero quest chain, the webstore bundle and past release banners. Name or id (partial ok), `--json`; exposed as MCP tool `shard_source` and as the site's `Shard sources 🔍` button. |
 | `tacticus-drop-rates.json` | Economy config: drop rates by tier × rarity, energy costs, regen + the `extra` daily sources (ad/crate/blackstone → 638/day behind `Days`) + the `spender` verdict-ceiling profiles, mercy notes, tunable `rank_item_rarity` (used by `--estimate`) |
 | `research/` | **Git-ignored, ~74 MB** — offline copies of the third-party sources used for game-mechanics research (planner repos, raw game config, wiki scrapes). See `research/README.md` |
 | `tacticus-shop-prices.json` | Daily Deals / shop prices (energy refill ladder, per-rarity singles, chests, requisition + EV, coins, `typical_single_bs` ladder behind the `SHOP` column, `blackstone_income` = subscription + promo-code estimates) with `fair_price_floor_bs` markup vs farming. For the buy-vs-farm angle. |
-| `tacticus_mcp.py` | Thin MCP adapter (stdio, stdlib only) exposing `rank_up_report`, `item_value`, `xp_gate`, `gear_report`, `ability_gate`, `power_delta`, `team_roster`, `machine_hunt`, `lres_report`, `shard_source`, `next_step`, `player_refresh` as agent tools + the two config files as resources. Marshalling only — runs the CLIs and returns their `--json` verbatim. Registered in `opencode.json`. |
+| `tacticus_mcp.py` | Thin MCP adapter (stdio, stdlib only) exposing `rank_up_report`, `item_value`, `xp_gate`, `gear_report`, `ability_gate`, `power_delta`, `team_roster`, `home_screen_event`, `lres_report`, `shard_source`, `next_step`, `player_refresh` as agent tools + the two config files as resources. Marshalling only — runs the CLIs and returns their `--json` verbatim. Registered in `opencode.json`. |
 | `make_bundle.py` | Packs the browser bundle (`dist/bundle.tar.gz`, gitignored): code + configs + planner data, **no roster/key**. |
 | `browser_harness.py` | Pyodide runner: extracts the bundle, shims the two `subprocess` call sites in-process. Self-check: `python3 browser_harness.py` (byte-equal vs real subprocess). |
-| `web/index.html` | Browser front end: Pyodide in-tab, brief via `next_step`, chat via the Worker proxy. Key stays in the tab (sessionStorage) and only transits the proxy to the game API. Chat replies render as HTML — markdown tables become sortable tables (DataTables + jQuery, jsDelivr). The key field links to the key generator (`https://api.tacticusgame.com/`), and a static table lists what this page ships (gates, farm incl. `+power`, purchases, events, chat); a `Hunt nodes` button runs `machine_hunt --items` in-browser, an `Uthar event` button runs `lres_report`, and a `Shard sources 🔍` button (with a character input) runs `shard_source`. Layout comes from water.css — dark by default, header button toggles light/dark. |
+| `web/index.html` | Browser front end: Pyodide in-tab, brief via `next_step`, chat via the Worker proxy. Key stays in the tab (sessionStorage) and only transits the proxy to the game API. Chat replies render as HTML — markdown tables become sortable tables (DataTables + jQuery, jsDelivr). The key field links to the key generator (`https://api.tacticusgame.com/`), and a static table lists what this page ships (gates, farm incl. `+power`, purchases, events, chat); a `Event nodes ⚔` button runs `home_screen_event --items` in-browser, an `Uthar event` button runs `lres_report`, and a `Shard sources 🔍` button (with a character input) runs `shard_source`. Layout comes from water.css — dark by default, header button toggles light/dark. |
 | `worker/worker.js` | Cloudflare Worker: `/player` CORS pass-through (key never stored), `/chat` LLM relay over the precomputed brief. |
 | `.github/workflows/pages.yml` | Deploys the site to GitHub Pages (re-fetches gitignored `research/`, pinned); a fast `test` job (`py_compile` + MCP smoke + `check_page.py`) gates the build, actions are SHA-pinned. |
 | `.tacticus_api_key` | API key (`chmod 600`), read by `gen_swagger.py` |
@@ -862,7 +862,7 @@ recommendations with efficiency ratings sit next door in
 `next_step.py` — the individual reports each answer exactly one question; this
 one convenes all seven witnesses fresh every run and answers *"where am I
 blocked, what should I do next?"*. It opens with an **EVENTS** block: live and
-upcoming event windows (from `machine_hunt.py`'s `events[]`), a strategy
+upcoming event windows (from `home_screen_event.py`'s `events[]`), a strategy
 pointer for events that have a dedicated report, and an explicit note for
 events that don't. It adds **no pricing logic of its own**
 (its only arithmetic is `d_power / energy`): energy comes from
@@ -960,23 +960,47 @@ Notes:
   and its gold to apply), then the best
   power-per-energy rungs, then gear, then unlocks.
 
-## Machine hunt event (mechanical kills)
+## Home-screen kill events (machine hunt, training rush)
 
-`machine_hunt.py` — for events that pay per Mechanical-trait enemy killed.
-Enemy trait from the planner's NPC catalog, per-node enemy lists and loot
+`home_screen_event.py` — for the events that pay per enemy killed. **Two events, one
+report**: `--event` picks which, defaulting to whichever is live right now.
+
+| | `machine-hunt` | `training-rush` |
+|---|---|---|
+| kills that score | `Mechanical` trait only | everything except `Summon` / `Steppable` |
+| also pays | — | hero XP × 2.5 (Common) .. 5 (Mythic), by the hero's rarity |
+| leftover points | 10 gold each | 3 gold each |
+
+Both pay 3 pts per Standard/Mirror kill and 5 per Elite kill, so `Pt/E` is the
+reward rate either way — the only real difference is *which* enemies count,
+which is why this is one tool rather than two.
+
+Enemy traits come from the planner's NPC catalog, per-node enemy lists and loot
 from the campaign data, and `Att` = attempts left today for that exact node
-straight from the player snapshot (daily cap 10 standard / 6 elite). Nodes
-with 0 attempts left are hidden — `--all` shows them; `?` = event campaign,
-which isn't in the snapshot. Ranked by event points per energy: the tracker
-pays 3 pts per Standard/Mirror mechanical kill and 5 pts per Elite kill.
+straight from the player snapshot (daily cap 10 standard / 6 elite). Nodes with
+0 attempts left are hidden — `--all` shows them; `?` in `Att` = event campaign,
+which isn't in the snapshot. The trackers themselves are parsed out of the
+shipped client bundle (`research/misc/bundle.js`) — it's minified with unquoted
+JS keys, so `json.loads` can't read it and the numbers are regex-sliced out.
+
+`XP/E` is the node's battle XP **before** the event multiplier, joined from
+gameconfig `battles.campaigns` (the planner has no XP column). It's what ranks
+nodes for the XP rush independently of points; the event campaigns have no
+gameconfig twin, so their XP stays unknown and they print `?`.
 
 ```bash
-python3 machine_hunt.py                  # best points/E, exhausted nodes hidden
-python3 machine_hunt.py --items          # balance: nodes that also drop your next-rank items
-python3 machine_hunt.py --all            # include nodes with 0 attempts left
-python3 machine_hunt.py indomitus-elite  # one campaign (substring)
-python3 machine_hunt.py --json --top 5   # machine-readable
+python3 home_screen_event.py                  # best points/E, exhausted nodes hidden
+python3 home_screen_event.py --items          # balance: nodes that also drop your next-rank items
+python3 home_screen_event.py --all            # include nodes with 0 attempts left
+python3 home_screen_event.py indomitus-elite  # one campaign (substring)
+python3 home_screen_event.py --json --top 5   # machine-readable
 
+python3 home_screen_event.py --xp-needed           # rank by XP/E + list XP-blocked heroes
+python3 home_screen_event.py --event machine-hunt  # force an event (default: the live one)
+python3 home_screen_event.py --track               # reward ladder + gold/point trade-in
+```
+
+```bash
 # Uthar LRES ("ancestors are watching"): teams, power walls, mission farms
 python3 lres_report.py                   # all three lanes (alpha/beta/gamma)
 python3 lres_report.py beta --json       # one lane, machine-readable
@@ -1039,7 +1063,7 @@ There is **no unlock-shard threshold anywhere in the game config**, so the tool
 lists sources and never claims what an unlock costs. Deliberately not a
 `next_step` witness — a per-character lookup, like `item_value`.
 
-On the website it's the `Shard sources 🔍` button next to `Hunt nodes`: type a
+On the website it's the `Shard sources 🔍` button next to `Event nodes`: type a
 name (any hero, owned or not) and it runs the same CLI in Pyodide. The chat is
 told to point there rather than guessing shop or campaign odds.
 
@@ -1058,7 +1082,7 @@ any MCP client:
 | tool `ability_gate` | `ability_gate.py --json` (pass `query` for one hero, `only` = `blocked`/`capped`/`ok`) |
 | tool `power_delta` | `power_delta.py --json` (pass `query` for one hero's formula breakdown) |
 | tool `team_roster` | `team_roster.py --json` (pass `query` for one comp id fragment: `multi`, `zkar`) |
-| tool `machine_hunt` | `machine_hunt.py --json` (pass `campaign` substring, `top`, `all`, `items`) |
+| tool `home_screen_event` | `home_screen_event.py --json` (pass `campaign` substring, `top`, `all`, `items`) |
 | tool `lres_report` | `lres_report.py --json` (pass `lane` = alpha/beta/gamma) |
 | tool `shard_source` | `shard_source.py --json` (pass `query` = character name or id) |
 | tool `next_step` | `next_step.py --json` (pass `top` for a longer farm list; ~1.1 s run) |
@@ -1078,7 +1102,7 @@ tacticus -- python3 /home/user/workspace/tacticus/tacticus_mcp.py`; check with
 `tools.tacticus.rank_up_report(...)` / `tools.tacticus.item_value(...)` /
 `tools.tacticus.xp_gate(...)` / `tools.tacticus.gear_report(...)` /
 `tools.tacticus.ability_gate(...)` / `tools.tacticus.power_delta(...)` /
-`tools.tacticus.team_roster(...)` / `tools.tacticus.machine_hunt(...)` /
+`tools.tacticus.team_roster(...)` / `tools.tacticus.home_screen_event(...)` /
 `tools.tacticus.lres_report(...)` /
 `tools.tacticus.shard_source(...)` /
 `tools.tacticus.next_step(...)` /

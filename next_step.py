@@ -65,14 +65,20 @@ WITNESSES = {
     "pw": ("power_delta.py", ["--json"]),
     "gear": ("gear_report.py", ["--json"]),
     "team": ("team_roster.py", ["--json"]),
-    "event": ("machine_hunt.py", ["--json"]),   # advisory: schedule awareness
+    "event": ("home_screen_event.py", ["--json"]),   # advisory: schedule awareness
 }
 
 # per-event advice when a dedicated report exists; anything else gets the
 # ad-hoc hook (build one on demand - pre-authorized 2026-10-03)
 EVENT_STRATEGY = {
     "hse-machine-hunt":
-        "python3 machine_hunt.py --items - nodes ranked by event Pt/E, attempts honored",
+        "python3 home_screen_event.py --items - nodes ranked by event Pt/E, attempts honored",
+    "hse-training-rush":
+        "python3 home_screen_event.py --items - Pt/E plus the 2.5-5x hero XP column;"
+        " --xp-needed to rank by XP/E when an XP-blocked hero is the target",
+    "hse-training-rush":
+        "python3 home_screen_event.py --event training-rush --items --xp-needed - "
+        "every kill counts; XP-multiplied runs, rank by XP/E when the XP gate bites",
     "legendary-event":
         "python3 lres_report.py - next-battle teams, power walls, mission farms",
 }

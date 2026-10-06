@@ -250,19 +250,23 @@ TOOLS = [
         },
     },
     {
-        "name": "machine_hunt",
-        "title": "Machine-hunt event farming",
+        "name": "home_screen_event",
+        "title": "Home-screen kill-event farming",
         "description": (
-            "Where do Mechanical enemies die cheapest? Campaign nodes "
-            "ranked by event points per energy (3 pts Standard/Mirror, 5 "
-            "Elite), your attempt count per node (exhausted hidden unless "
-            "all=true), and the live/upcoming event window. items=true also "
+            "Which campaign node gives most value during a home-screen kill "
+            "event? Covers machine-hunt and training-rush (event=auto picks "
+            "the live one). Nodes ranked by event points per energy (3 pts "
+            "Standard/Mirror, 5 Elite), your attempt count per node "
+            "(exhausted hidden unless all=true), and the live/upcoming event "
+            "window. Training rush also pays hero XP by rarity, so xp_needed "
+            "re-ranks on XP/E and lists XP-blocked heroes. items=true also "
             "flags nodes that drop items your next rank-ups need, with a "
             "footer totalling the need per item and per top hero. campaign "
             "filters by substring of the campaign id ('indomitus'). Returns "
-            "{schema_version, event_ends, events, rows:[...]} - rows carry "
-            "pt_per_e, pts, att, want, need. next_step convenes this as its "
-            "advisory 'event' witness (schedule awareness only)."
+            "{schema_version, event, event_ends, events, rows:[...]} - rows "
+            "carry pt_per_e, pts, xp_per_e, att, want, need. next_step "
+            "convenes this as its advisory 'event' witness (schedule "
+            "awareness only)."
         ),
         "inputSchema": {
             "type": "object",
@@ -312,7 +316,7 @@ TOOLS = [
         "description": (
             "The assembler: convenes seven witnesses fresh (rank_up_report "
             "--energy, xp_gate, ability_gate, power_delta, gear_report, "
-            "team_roster, machine_hunt as the advisory event witness) into "
+            "team_roster, home_screen_event as the advisory event witness) into "
             "one brief - WHERE I'M BLOCKED (per-gate "
             "counts with hero examples) and WHAT TO DO NEXT in leverage "
             "order (shared-pool badge purchases -> apply books in stock -> "
@@ -419,7 +423,7 @@ INSTRUCTIONS = (
     "and what to do next (seven witnesses, one run, ~1.1 s) - start there "
     "when the question spans gates. team_roster checks the curated "
     "guild-raid comps (fieldability only, no synergy score exists in "
-    "config). machine_hunt ranks campaign nodes by event points per energy "
+    "config). home_screen_event ranks campaign nodes by event points per energy "
     "with your attempt counts - the 'where do I hunt next?' answer. "
     "lres_report covers the live Legendary Release Event: per-lane "
     "specialist teams, power walls and mission farms; its event window is "
@@ -490,8 +494,8 @@ def build_argv(name, args):
             argv.append(str(args["query"]))
         argv.append("--json")
         return argv
-    if name == "machine_hunt":
-        argv = [sys.executable, str(BASE / "machine_hunt.py"), "--json"]
+    if name == "home_screen_event":
+        argv = [sys.executable, str(BASE / "home_screen_event.py"), "--json"]
         if args.get("campaign"):
             argv.append(str(args["campaign"]))
         if args.get("items"):

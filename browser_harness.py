@@ -3,7 +3,7 @@
 
 The bundle (make_bundle.py) ships every CLI; in a browser there is no
 fork/exec, so the two subprocess call sites (next_step.fetch,
-machine_hunt.wanted) run their target CLIs in-process instead:
+home_screen_event.wanted) run their target CLIs in-process instead:
 
   bootstrap(bundle_bytes, player_json, workdir)  extract bundle + snapshot
   install()                                      patch subprocess.run
@@ -83,7 +83,7 @@ def _selftest():
     cases = [
         ["rank_up_report.py", "--energy", "--json", "--top", "5"],
         ["next_step.py", "--json", "--top", "3"],
-        ["machine_hunt.py", "--json", "--top", "5"],
+        ["home_screen_event.py", "--json", "--top", "5"],
     ]
     # ground truth first: real subprocess from the repo tree
     truth = [subprocess.run([sys.executable, str(here / c[0])] + c[1:],
