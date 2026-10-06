@@ -4,9 +4,10 @@
 Everything the witness CLIs open at runtime, mirrored at repo-root layout so
 BASE = Path(__file__).parent keeps working after extraction:
 
-    *.py, tacticus-drop-rates.json, tacticus-shop-prices.json,
+    *.py, event-config.js, tacticus-drop-rates.json,
+    tacticus-shop-prices.json,
     research/tacticus-planner-api/.../Data/**, research/datamine/gameconfig142.json,
-    research/misc/bundle.js  (the liveEventConfig blocks home_screen_event slices)
+    research/misc/bundle.js  (the liveEventConfig blocks home_screen_event reads)
 
 Deliberately EXCLUDED: tacticus-player.json (roster - the visitor fetches
 their own through the Worker) and .tacticus_api_key (never leaves this box).
@@ -26,6 +27,10 @@ FORBIDDEN = {"tacticus-player.json", ".tacticus_api_key", "swagger-ui.html"}
 # bundle carries only the blocks — same filename and path, so the tool has no
 # second code path and local runs still read the real file.
 BUNDLE_JS = BASE / "research" / "misc" / "bundle.js"
+# The 7 MB SPA bundle is a build artifact nobody can pin a URL to, so CI cannot
+# fetch it. event-config.js is those same two blocks, committed (6 KB, AGPL
+# planner web-app asset) so the browser build has no unpinnable dependency.
+SLIM_JS = BASE / "event-config.js"
 
 
 def event_block_slice(src, tier):
@@ -44,14 +49,22 @@ def event_block_slice(src, tier):
 
 def slim_bundle_js():
     """(bytes, [tier,...]) of the event blocks, read from EVENTS so a third
-    home-screen event ships without touching this file."""
+    home-screen event ships without touching this file.
+
+    Slices the 7 MB client bundle when research/ has it, else falls back to the
+    committed event-config.js — which is already the two blocks, so it only has
+    to contain them.
+    """
     import home_screen_event
-    src = BUNDLE_JS.read_text(encoding="utf8", errors="replace")
     tiers = [v["tier"] for v in home_screen_event.EVENTS.values()]
-    blocks = [event_block_slice(src, t) for t in tiers]
-    missing = [t for t, b in zip(tiers, blocks) if not b]
-    assert not missing, f"tier config not found in bundle.js: {missing}"
-    return ("\n".join(blocks)).encode("utf8"), tiers
+    if BUNDLE_JS.exists():
+        src = BUNDLE_JS.read_text(encoding="utf8", errors="replace")
+        out = "\n".join(event_block_slice(src, t) for t in tiers)
+    else:
+        out = SLIM_JS.read_text(encoding="utf8")
+    missing = [t for t in tiers if f'eventName:"{t}"' not in out]
+    assert not missing, f"tier config not found in {BUNDLE_JS.name}/{SLIM_JS.name}: {missing}"
+    return out.encode("utf8"), tiers
 
 
 def members():
