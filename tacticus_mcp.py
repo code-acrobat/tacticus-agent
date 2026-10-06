@@ -274,6 +274,17 @@ TOOLS = [
                 "campaign": {"type": "string",
                              "description": "substring of the campaign id "
                                             "(e.g. 'indomitus')"},
+                "event": {"type": "string",
+                          "enum": ["auto", "machine-hunt", "training-rush"],
+                          "description": "which home-screen event (default "
+                                         "auto = whichever occurrence is live)"},
+                "xp_needed": {"type": "boolean",
+                              "description": "rank on XP/E instead of Pt/E "
+                                             "and list XP-blocked heroes "
+                                             "(training rush pays hero XP)"},
+                "track": {"type": "boolean",
+                          "description": "include the tiered progress-reward "
+                                         "ladder + leftover-points gold rate"},
                 "top": {"type": "integer", "minimum": 1,
                         "description": "rows to show (default 15)"},
                 "all": {"type": "boolean",
@@ -498,6 +509,12 @@ def build_argv(name, args):
         argv = [sys.executable, str(BASE / "home_screen_event.py"), "--json"]
         if args.get("campaign"):
             argv.append(str(args["campaign"]))
+        if args.get("event") and args["event"] != "auto":
+            argv += ["--event", str(args["event"])]
+        if args.get("xp_needed"):
+            argv.append("--xp-needed")
+        if args.get("track"):
+            argv.append("--track")
         if args.get("items"):
             argv.append("--items")
         if args.get("all"):
