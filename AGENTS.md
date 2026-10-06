@@ -519,6 +519,18 @@ Only "Failed to fetch" indicates a proxy/CORS problem.
   library docs (used here for the Swagger UI standalone setup).
 - The bundled key has scope **`Player` only** — `/api/v1/guild` and
   `/api/v1/guildRaid` will return `403` for this user.
+- **A new/renamed MCP tool arg needs a restart to become callable.** The tool
+  catalog is snapshotted at session start, so editing `tacticus_mcp.py`'s
+  `inputSchema` does NOT update the tools already in context — the old schema
+  keeps being served and the agent silently falls back to shell. Two routes,
+  both usable from the shell tool (this is not an omac restriction):
+  `opencode service restart` (blunt — the background service owns the running
+  session, so it ends the current turn) or the per-server endpoints
+  `opencode api post /api/experimental/mcp/tacticus/disconnect` then
+  `.../connect` (found in `opencode api get /openapi.json`; non-destructive).
+  Even a reconnect may not refresh the in-context catalog, so a fresh session
+  can be required. **When adding an arg to a `tacticus_mcp.py` tool, say so
+  and tell the user to restart — do not quietly shell out instead.**
 - **`.mise.toml` pins tool versions** (node 24 for openspec — Ubuntu apt ships
   18.19.1 and `/usr/local` is root-owned so `npm -g` fails; openspec 1.13.2).
   `mise install` on first run, `mise upgrade` to update; the shims dir must be
