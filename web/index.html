@@ -60,8 +60,13 @@ the <a href="https://github.com/code-acrobat/tacticus-agent" rel="noopener">sour
 <div id="status"></div>
 <pre id="brief" hidden></pre>
 <div id="huntrow">
+  <select id="evpick" disabled title="Which home-screen event to rank for">
+    <option value="auto">auto (live event)</option>
+    <option value="machine-hunt">machine hunt</option>
+    <option value="training-rush">training rush</option>
+  </select>
   <button id="hunt" type="button" disabled>Event nodes ⚔</button>
-  <span class="note">runs <code>home_screen_event --items</code> in your browser — every scoring node ranked by event points per energy</span>
+  <span class="note">runs <code>home_screen_event --event &lt;pick&gt; --items</code> in your browser — every scoring node ranked by event points per energy</span>
   <button id="lres" type="button" disabled>Uthar event ⚔</button>
   <span class="note">runs <code>lres_report</code> in your browser — next-battle teams, power walls, mission farms</span>
 </div>
@@ -129,8 +134,9 @@ $('hunt').addEventListener('click', async () => {
   if (busy || !booted) return;
   busy = true; $('hunt').disabled = true;
   try {
-    status('ranking hunt nodes (home_screen_event --items)…');
-    $('huntout').textContent = await py.runPythonAsync('str(_h.run_cli("/tacticus/home_screen_event.py", ["--items"]).stdout)');
+    const ev = $('evpick').value;
+    status('ranking hunt nodes (home_screen_event --event ' + ev + ' --items)…');
+    $('huntout').textContent = await py.runPythonAsync('str(_h.run_cli("/tacticus/home_screen_event.py", ["--event", "' + ev + '", "--items"]).stdout)');
     $('huntout').hidden = false;
     $('hunt').textContent = 'Hide hunt nodes';
     huntOn = true;
@@ -230,6 +236,7 @@ async function loadAccount() {
     $('chat').hidden = false;
     $('ask').disabled = false;
     $('hunt').disabled = false;
+    $('evpick').disabled = false;
     $('lres').disabled = false;
     $('shards').disabled = false;
     $('shardq').disabled = false;
