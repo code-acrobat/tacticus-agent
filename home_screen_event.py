@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """Home-screen kill events: which campaign node is worth the energy.
 
-Two events, one report (`--event`, default: whichever is live right now):
+Three events, one report (`--event`, default: whichever is live right now):
 `machine-hunt` scores Mechanical-trait kills only, `training-rush` scores
 every non-Summon/non-Steppable kill AND multiplies hero XP by the character's
 rarity (2.5x Common .. 5x Mythic). Both pay 3 pts/kill in Standard/Mirror and
 5 in Elite/MirrorElite, so Pt/E is the reward rate either way — the per-event
 difference is only which enemies count, which is why this is one tool.
+
+`against-the-tide` is the odd one: it pays 1 pt per enemy WAVE defeated and
+only in Salvage Run / Onslaught / the Survival event's own mode, so campaign
+nodes score nothing and there is no Pt/E table to print. It reports what is
+actually actionable there — your token stock per mode, the reward track and
+the leftover-point gold trade-in.
 
 Who counts comes from planner npcs/*.json traits vs the event's
 traitRestrictions (parsed out of the shipped client bundle, which is the only
@@ -53,6 +59,12 @@ GAMECONFIG = HERE / "research/datamine/gameconfig142.json"
 # restrictions decide whose kills count, and the planner occurrence to window
 # it by. Tier (low/mid/high) is chosen server-side and is NOT derivable — the
 # trackers/modifiers are identical across tiers, only the ladder differs.
+
+# snapshot progress keys of the two standing modes the wave tracker allows
+# (the third, "Waves", is the Survival event's own mode and carries no standing
+# token line in the snapshot).
+WAVE_MODES = (("onslaught", "Onslaught"), ("salvageRun", "Salvage Run"))
+
 EVENTS = {
     "machine-hunt": {
         "label": "machine hunt", "definition": "hse-machine-hunt",
@@ -65,6 +77,18 @@ EVENTS = {
         "tier": "rarity_training_rush_tier_high",
         "progress": "hse_rarity_training_rush_tier_high",
         "needs": set(), "skip": {"Summon", "Steppable"},
+    },
+    # wave event: 1 pt/wave in the modes listed by its defeatWaves tracker, no
+    # campaign nodes at all. `tier` is the last client config shipped for it
+    # (defeat_waves_2 = the Sept 2026 run, seasonalEventCurrencySeptember2026);
+    # the next run may arrive as a new `defeat_waves*` tier — repoint this one
+    # line after a research/ sync, the report itself is tier-agnostic.
+    "against-the-tide": {
+        "label": "against the tide", "definition": "hse-against-the-tide",
+        "tier": "defeat_waves_2_tier_high",
+        "progress": "hse_defeat_waves_2_tier_high",
+        "needs": set(), "skip": set(),
+        "wave_modes": WAVE_MODES,
     },
 }
 
@@ -98,7 +122,7 @@ def kill_rates(event_name):
     """
     blk = event_block(event_name) or ""
     out = set()
-    for tr in re.finditer(r'type:"killUnits".{0,240}?points:(\d+)', blk):
+    for tr in re.finditer(r'type:"(?:killUnits|defeatWaves)".{0,240}?points:(\d+)', blk):
         out.add(int(tr.group(1)))
     return out or {3}
 
@@ -165,6 +189,20 @@ def attempts():
     return {(c["id"], b["battleIndex"]): b["attemptsLeft"]
             for c in doc["player"]["progress"]["campaigns"]
             for b in c["battles"]}
+
+
+def token_rows(now):
+    """[{mode, label, tokens, max, next_in}] for the standing wave modes."""
+    prog = json.load(open(HERE / "tacticus-player.json"))["player"]["progress"]
+    out = []
+    for key, label in WAVE_MODES:
+        t = (prog.get(key) or {}).get("tokens") or {}
+        nxt = t.get("nextTokenInSeconds") or 0
+        out.append({"mode": key, "label": label,
+                    "tokens": t.get("current"), "max": t.get("max"),
+                    "next_in": (now + timedelta(seconds=nxt)).strftime("%H:%M UTC")
+                    if nxt else None})
+    return out
 
 
 def _occurrences():
@@ -254,6 +292,8 @@ def battle_xp():
 
 def nodes(event, att, xp_of):
     """One row per node whose kills score: {campaign, id, kills, foes, xp, ...}."""
+    if EVENTS[event].get("wave_modes"):
+        return []                       # waves, not campaign kills - no nodes
     score = countable(npc_traits(), event)
     rates = sorted(kill_rates(EVENTS[event]["tier"]))
     elite = rates[-1]                       # the higher rate IS the elite one
@@ -339,11 +379,21 @@ def selftest():
     assert all(r["xp"] is None for r in rush if "vs-" in r["campaign"])
     indo = [r for r in mech if r["campaign"] == "indomitus"]
     assert any(r["kills"] == r["foes"] for r in indo)  # pure-Necron nodes
-    for name in EVENTS:
-        rates = kill_rates(EVENTS[name]["tier"])
+    for name, evd in EVENTS.items():
+        if evd.get("wave_modes"):
+            continue                    # no killUnits trackers (asserted below)
+        rates = kill_rates(evd["tier"])
         assert rates == {3, 5}, (name, rates)
-        assert gold_per_point(EVENTS[name]["tier"])
-        assert reward_ladder(EVENTS[name]["progress"]), name
+        assert gold_per_point(evd["tier"])
+        assert reward_ladder(evd["progress"]), name
+    # against the tide: 1 pt/wave, token lines from the snapshot, ladder present
+    assert nodes("against-the-tide", att, xp_of) == []
+    assert kill_rates(EVENTS["against-the-tide"]["tier"]) == {1}
+    assert gold_per_point(EVENTS["against-the-tide"]["tier"]) == 200  # not 3 like the kill events
+    assert reward_ladder(EVENTS["against-the-tide"]["progress"])
+    tok = token_rows(now)
+    assert [m["mode"] for m in tok] == ["onslaught", "salvageRun"]
+    assert all(m["max"] and m["tokens"] >= 0 for m in tok)
     assert xs_mult(EVENTS["training-rush"]["tier"])["Mythic"] == 5.0
     assert xs_mult(EVENTS["machine-hunt"]["tier"]) == {}
     assert event_window(now, "training-rush") == event_window(now, "training-rush")
@@ -355,6 +405,51 @@ def selftest():
     assert all(i in cat and cat[i].get("label") for i in w)  # every wanted leaf is named
     print(f"selftest OK: {len(mech)} machine-hunt / {len(rush)} training-rush nodes, "
           f"{len(xp_of)} xp rows, {len(att)} attempt slots, {len(w)} wanted leaves")
+
+
+def wave_main(event, a, now, ends):
+    """Report for a wave event: your token stock, the track, the trade-in.
+
+    No Pt/E table exists for it — the tracker scores waves in Salvage Run /
+    Onslaught / the Survival event's own mode, never campaign nodes.
+    """
+    ev = EVENTS[event]
+    modes = token_rows(now)
+    ladder = reward_ladder(ev["progress"])
+    gpp = gold_per_point(ev["tier"])
+    if a.json:
+        doc = {"schema_version": 1, "event": event,
+               "event_ends": ends.isoformat() if ends else None,
+               "events": event_list(now), "wave_modes": modes}
+        if a.track:
+            doc["reward_track"] = [{"points": p, "reward": r, "endless": e}
+                                   for p, r, e in ladder]
+            doc["gold_per_point"] = gpp
+        print(json.dumps(doc, indent=1))
+        return 0
+    if ends:
+        left = ends - now
+        print(f"{ev['label']} LIVE — ends {ends:%Y-%m-%d %H:%M} UTC "
+              f"({left.days}d {left.seconds // 3600}h left)")
+    print(f"{min(kill_rates(ev['tier']))} pt per wave — "
+          + " / ".join(lbl for _, lbl in WAVE_MODES)
+          + " / Survival (the event's own mode); campaign nodes score nothing")
+    print(f"{'Mode':<12} {'Tokens':>7}   Next token")
+    for m in modes:
+        tok = "?" if m["tokens"] is None else f"{m['tokens']}/{m['max']}"
+        print(f"{m['label']:<12} {tok:>7}   {m['next_in'] or '-'}")
+    if a.track:
+        if ladder:
+            print("Track: " + ", ".join(
+                f"{p:,}{'+' if e else ''} {r}" for p, r, e in ladder))
+        else:
+            print("Track: unavailable (needs research/datamine/gameconfig142.json)")
+    if gpp:
+        print(f"leftover points trade in for {gpp} gold each")
+    if a.items or a.xp_needed:
+        print("note: --items/--xp-needed do not apply here - this event scores "
+              "waves, not campaign drops or hero XP")
+    return 0
 
 
 def main():
@@ -384,6 +479,8 @@ def main():
     xs = xs_mult(ev["tier"])
     rows = nodes(event, attempts(), battle_xp() if xs else {})
     ends = event_window(now, event)
+    if ev.get("wave_modes"):
+        return wave_main(event, a, now, ends)
     if a.campaign:
         rows = [r for r in rows if a.campaign.lower() in r["campaign"]]
     if not a.all:

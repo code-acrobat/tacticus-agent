@@ -79,6 +79,10 @@ EVENT_STRATEGY = {
     "hse-training-rush":
         "python3 home_screen_event.py --event training-rush --items --xp-needed - "
         "every kill counts; XP-multiplied runs, rank by XP/E when the XP gate bites",
+    "hse-against-the-tide":
+        "python3 home_screen_event.py --event against-the-tide --track - 1 pt per "
+        "wave in Salvage Run/Onslaught/Survival (campaign nodes score nothing); "
+        "spend your tokens, then the reward track",
     "legendary-event":
         "python3 lres_report.py - next-battle teams, power walls, mission farms",
 }

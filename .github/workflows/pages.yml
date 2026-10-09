@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: false
 env:
   # bump on every research sync (AGENTS.md "External data sync")
-  PLANNER_SHA: 15fd7eb50f7eb6e8af9a51f6054d62ecf07d43f1
+  PLANNER_SHA: 6fa9eb9af1cf1074608f2071c26e1cd9521cf857
 jobs:
   test:
     runs-on: ubuntu-latest
