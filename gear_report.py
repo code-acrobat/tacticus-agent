@@ -345,12 +345,17 @@ def candidates_for(slot, unit, pool, catalog, target_rank, amounts=None):
     A relic spare can only go into a slot listed in the unit's
     `itemSlotsRelic` indices (index 0/1/2 = Slot1/Slot2/Slot3); ordinary
     spares fit any slot of the right type, relic slot included.
+    A hero cannot equip gear above his own rarity (Mythic spares are
+    Mythic-hero-only), so pieces past `unit["rarity_rank"]` are skipped.
     """
     index = int(str(slot.get("slotId", "Slot1"))[-1] or 1) - 1
+    unit_rank = unit.get("rarity_rank", -1)
     out = []
     for entry in pool.values():
         left = (amounts or {}).get(entry["id"], entry["amount"])
         if left <= 0 or entry["type"] not in slot["accepted"]:
+            continue
+        if entry["rarity_rank"] > unit_rank:
             continue
         if entry.get("relic") and index not in unit.get("relic_slots", ()):
             continue
