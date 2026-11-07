@@ -83,6 +83,9 @@ EVENT_STRATEGY = {
         "python3 home_screen_event.py --event against-the-tide --track - 1 pt per "
         "wave in Salvage Run/Onslaught/Survival (campaign nodes score nothing); "
         "spend your tokens, then the reward track",
+    "hse-warp-surge":
+        "python3 home_screen_event.py --event warp-surge --items - Chaos kills; "
+        "PvP pays 25/kill vs 3 std / 5 elite in campaign, nodes ranked by Pt/E",
     "legendary-event":
         "python3 lres_report.py - next-battle teams, power walls, mission farms",
 }

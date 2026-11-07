@@ -4,9 +4,11 @@
 rank_up_report.py's --estimate mode guesses a rarity; this module does the
 real arithmetic by joining the offline game catalog in research/ :
 
-    units/units-*.json          rankUpUpgrades[rank].upgradeIds = the 6 cells
-    upgrades/upgrades-*.json    id -> rarity, craftable, recipe[{material,count}]
-    campaign-battles/*.json     per node: energyCost + rewards
+    datamine raw (post-2026-11 planner restructure, see SKILL.md):
+    units/lineup.json         upgrades[] rows = the 6 cell ids per rank
+    upgrades.json             crafting[] = {id, amount} recipe tree
+    battles/campaigns.json    per node: staminaCost + loot{base,chanceOf}
+    curated/campaign-curation.json  group -> node-id prefix
     drop-chances.json           chanceId -> effectiveRate (mercy ALREADY baked in)
 
 Model
@@ -32,14 +34,17 @@ footer.
 """
 import json
 import pathlib
+import re
 from collections import Counter
 
 BASE = pathlib.Path(__file__).resolve().parent
 DATA = (BASE / "research" / "tacticus-planner-api" / "src"
         / "TacticusPlanner.GameCatalog" / "Data")
-UNITS_DIR = DATA / "units"
-UPGRADES_DIR = DATA / "upgrades"
-BATTLES_DIR = DATA / "campaign-battles"
+RAW = DATA / "datamine" / "raw" / "gameconfig"
+UNITS_FILE = RAW / "units" / "lineup.json"
+UPGRADES_FILE = RAW / "upgrades.json"
+CAMPAIGNS_FILE = RAW / "battles" / "campaigns.json"
+CURATION_FILE = DATA / "curated" / "campaign-curation.json"
 DROP_CHANCES = DATA / "drop-chances.json"
 
 
@@ -65,25 +70,41 @@ def _require(path):
 
 
 def load_units():
-    """id -> character record (also keyed by name)."""
+    """id -> character record (also keyed by name), rank grid normalized.
+
+    The raw lineup keeps the 6-cell grid as `upgrades` rows (20 ranks); the
+    old served shape called that `rankUpUpgrades[].upgradeIds`, which is what
+    cells() reads, so it is aliased here and nothing downstream changes.
+    """
     by_id, by_name = {}, {}
-    for path in sorted(_require(UNITS_DIR).glob("units-*.json")):
-        for character in (_read(path) or {}).get("characters") or []:
-            by_id[character["id"]] = character
-            by_name[character["name"]] = character
-    if not by_id:
-        raise MissingSource(f"no characters under {UNITS_DIR}")
+    for cid, unit in (_read(_require(UNITS_FILE)) or {}).items():
+        if not isinstance(unit, dict):
+            continue
+        if unit.get("upgrades"):
+            unit = dict(unit, rankUpUpgrades=[{"upgradeIds": row}
+                                              for row in unit["upgrades"]])
+        by_id[cid] = unit
+        if unit.get("name"):
+            by_name[unit["name"]] = unit
+    gridded = sum(1 for u in by_id.values() if u.get("rankUpUpgrades"))
+    if gridded < 100:  # canary: `upgrades` key renamed upstream?
+        raise MissingSource(f"only {gridded} units with a rank grid in {UNITS_FILE}")
     return by_id, by_name
 
 
 def load_upgrades():
-    """id -> {rarity, craftable, recipe}. 557 items across 11 files."""
+    """id -> catalog item. Raw `crafting[{id,amount}]` -> recipe[{material,count}]."""
     catalog = {}
-    for path in sorted(_require(UPGRADES_DIR).glob("upgrades-*.json")):
-        for item in _read(path) or []:
-            catalog[item["id"]] = item
-    if not catalog:
-        raise MissingSource(f"no upgrades under {UPGRADES_DIR}")
+    for iid, raw in (_read(_require(UPGRADES_FILE)) or {}).items():
+        item = dict(raw, id=iid, stat=raw.get("statType"),
+                    label=raw.get("name") or iid)
+        craft = item.pop("crafting", None)
+        item["craftable"] = bool(craft)
+        item["recipe"] = [{"material": c["id"], "count": c.get("amount", 0)}
+                          for c in craft or []]
+        catalog[iid] = item
+    if sum(1 for i in catalog.values() if i["craftable"]) < 300:  # canary
+        raise MissingSource(f"crafting recipes missing in {UPGRADES_FILE}")
     return catalog
 
 
@@ -104,7 +125,7 @@ def _farms(nodes, chances, event):
         rewards = node.get("rewards") or {}
         potential = rewards.get("potential") or []
         guaranteed = rewards.get("guaranteed") or []
-        node_is_event = any("event" in (p.get("chanceId") or "") for p in potential)
+        node_is_event = node.get("_event", False)   # bucket Event, set by load_farms
         if node_is_event != event:
             continue
         cost = node.get("energyCost")
@@ -128,13 +149,84 @@ def _farms(nodes, chances, event):
     return best
 
 
+_RARITY = {"C": "Common", "U": "Uncommon", "R": "Rare", "E": "Epic",
+           "L": "Legendary", "M": "Mythic"}
+
+
+def _chance_id(item, bucket, group, challenge):
+    """chanceOf item -> drop-chances key `kind_<difficulty>[Challenge]`.
+
+    Mirrors the served campaign-battles projection (SKILL.md): the difficulty
+    comes from the bucket, except Event groups which split eventStandard /
+    eventExtremis by group id; challenge ("B" battle ids) appends Challenge.
+    """
+    m = re.match(r"upg(?:Hp|Dmg|Arm)([CURELM])", item)
+    if item.startswith("mythicShards"):
+        kind = "mythicShard"
+    elif item.startswith("shards"):
+        kind = "shard"
+    elif m:
+        kind = "upgrade" + _RARITY[m.group(1)]
+    else:
+        return None
+    if bucket == "Event":
+        diff = ("eventStandard" if group.startswith("eventStandard")
+                else "eventExtremis")
+    else:
+        diff = {"Standard": "standard", "Mirror": "mirror",
+                "Elite": "elite", "EliteMirror": "elite"}.get(bucket, bucket)
+    return f"{kind}_{diff}{'Challenge' if challenge else ''}"
+
+
 def load_farms():
-    if not _require(BATTLES_DIR).exists() or not _require(DROP_CHANCES).exists():
+    """Build the farm node list from raw campaigns + curation, then price it."""
+    if not (CAMPAIGNS_FILE.exists() and CURATION_FILE.exists()
+            and DROP_CHANCES.exists()):
         raise MissingSource("campaign data missing")
+    camps = _read(CAMPAIGNS_FILE)
+    by_id = {g["id"]: (bucket, g)
+             for bucket, gs in camps.items() for g in gs}
+    cur = _read(CURATION_FILE) or {}
     nodes = []
-    for path in sorted(BATTLES_DIR.glob("campaign-battles-*.json")):
-        nodes.extend((_read(path) or {}).get("battles") or [])
+    for key in sorted(cur):
+        if not key.startswith("campaign-battles-"):
+            continue
+        for spec in (cur[key].get("campaigns") or []):
+            bucket, g = by_id[spec["campaign"]]
+            prefix = spec["battleIdPrefix"]
+            for b in g["battles"]:
+                bid = b["battleId"]
+                challenge = "B" in bid
+                node_id = (prefix + "C" + bid.lstrip("0") if challenge
+                           else prefix + bid)
+                loot = b.get("loot") or {}
+                guaranteed = []
+                for s in loot.get("base") or []:
+                    iid, _, rng = s.partition(":")
+                    if rng:
+                        lo, _, hi = rng.partition("-")
+                        lo = int(lo)
+                        guaranteed.append({"id": iid, "min": lo,
+                                           "max": int(hi) if hi else lo})
+                    else:
+                        guaranteed.append({"id": iid, "min": 1, "max": 1})
+                potential = []
+                cf = loot.get("chanceOf")
+                if cf:
+                    iid = cf.split("%")[0]
+                    cid = _chance_id(iid, bucket, g["id"], challenge)
+                    if cid:
+                        potential.append({"id": iid, "chanceId": cid})
+                nodes.append({
+                    "id": node_id, "energyCost": b.get("staminaCost") or 0,
+                    "rewards": {"guaranteed": guaranteed,
+                                "potential": potential},
+                    "_event": bucket == "Event",
+                })
     chances = {row["id"]: row for row in _read(DROP_CHANCES) or []}
+    if len(nodes) < 1200 or len(chances) < 30:  # canary: curation/rate drift
+        raise MissingSource(
+            f"farms collapsed: {len(nodes)} nodes, {len(chances)} chances")
     return {"permanent": _farms(nodes, chances, False),
             "event": _farms(nodes, chances, True),
             "nodes": len(nodes), "chances": len(chances)}
@@ -224,5 +316,6 @@ def price(items, catalog, owned, farms):
 
 def available():
     """True when the catalog the exact model needs is on disk."""
-    return (UNITS_DIR.is_dir() and UPGRADES_DIR.is_dir()
-            and BATTLES_DIR.is_dir() and DROP_CHANCES.is_file())
+    return (UNITS_FILE.is_file() and UPGRADES_FILE.is_file()
+            and CAMPAIGNS_FILE.is_file() and CURATION_FILE.is_file()
+            and DROP_CHANCES.is_file())

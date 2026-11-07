@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Home-screen kill events: which campaign node is worth the energy.
 
-Three events, one report (`--event`, default: whichever is live right now):
+Four events, one report (`--event`, default: whichever is live right now):
 `machine-hunt` scores Mechanical-trait kills only, `training-rush` scores
 every non-Summon/non-Steppable kill AND multiplies hero XP by the character's
-rarity (2.5x Common .. 5x Mythic). Both pay 3 pts/kill in Standard/Mirror and
+rarity (2.5x Common .. 5x Mythic), `warp-surge` scores Chaos-alliance kills
+(25 pts in PvP, 5 Elite, 3 Standard — PvP is the rate, campaign is the table
+below). The two kill events pay 3 pts/kill in Standard/Mirror and
 5 in Elite/MirrorElite, so Pt/E is the reward rate either way — the per-event
 difference is only which enemies count, which is why this is one tool.
 
@@ -14,14 +16,15 @@ nodes score nothing and there is no Pt/E table to print. It reports what is
 actually actionable there — your token stock per mode, the reward track and
 the leftover-point gold trade-in.
 
-Who counts comes from planner npcs/*.json traits vs the event's
-traitRestrictions (parsed out of the shipped client bundle, which is the only
-place the trackers live); per-node enemy lists + loot from
-campaign-battles/*.json. `Att` = attempts left today for that exact node,
-straight from the player snapshot (`progress.campaigns`, cap 10 standard /
-6 elite); nodes with 0 left are hidden unless `--all`, `?` = no attempt data
-(event campaigns aren't in the snapshot). `XP/E` is the node's battle XP before
-the event multiplier (gameconfig has it, the planner doesn't), so it ranks nodes
+Who counts comes from the datamine npc catalog (traits + `GrandAllianceId`,
+the game's trait filters match alliances too) vs the event's traitRestrictions
+(parsed out of the shipped client bundle, which is the only place the trackers
+live); per-node enemy lists + loot + XP from the datamine `battles/campaigns.json`
+(the planner builds its served catalog from the same file). `Att` = attempts
+left today for that exact node, straight from the player snapshot
+(`progress.campaigns`, cap 10 standard / 6 elite); nodes with 0 left are hidden
+unless `--all`, `?` = no attempt data (event campaigns aren't in the snapshot).
+`XP/E` is the node's battle XP before the event multiplier, so it ranks nodes
 for the XP rush independently of points.
 
 --items adds the balance view: rank nodes that drop leaves your roster's next
@@ -90,6 +93,14 @@ EVENTS = {
         "needs": set(), "skip": set(),
         "wave_modes": WAVE_MODES,
     },
+    # Chaos-alliance kills: 25 pts/kill in PvP (the rate), 5 Elite / 3
+    # Standard in campaign (the table). needs = alliance, not a trait.
+    "warp-surge": {
+        "label": "warp surge", "definition": "hse-warp-surge",
+        "tier": "warp_surge_tier_high",
+        "progress": "hse_warp_surge_tier_high",
+        "needs": {"Chaos"}, "skip": {"Summon", "Steppable"},
+    },
 }
 
 
@@ -127,6 +138,32 @@ def kill_rates(event_name):
     return out or {3}
 
 
+def campaign_rates(event_name):
+    """(standard, elite) pts per kill from the campaign killUnits trackers.
+
+    kill_rates() flattens every tracker's points into one set, which is right
+    for "what rates exist" but wrong for pricing a campaign row when a third
+    tracker pays more elsewhere (warp surge: 25 in PvP). The elite tracker
+    *allows* EliteCampaign; the standard one either disallows it or allows
+    only the non-elite modes. PvP-only trackers are skipped.
+    """
+    blk = event_block(event_name) or ""
+    std = elite = None
+    for chunk in blk.split('type:"killUnits"')[1:]:
+        pm = re.search(r'points:(\d+)', chunk)
+        gm = re.search(r'gameModeRestrictions:\{(.*?)\}', chunk)
+        if not pm or not gm:
+            continue
+        modes = gm.group(1)
+        allow = re.search(r'(?<!dis)allowed:\[([^\]]*)\]', modes)
+        allow = allow.group(1) if allow else ""
+        if "EliteCampaign" in allow:
+            elite = int(pm.group(1))
+        elif "Campaign" in allow or ("disallowed" in modes and "EliteCampaign" in modes):
+            std = int(pm.group(1))
+    return std, elite
+
+
 def xs_mult(event_name):
     """{rarity: XP multiplier} from a unitXp modifier, else {}.
 
@@ -160,11 +197,19 @@ def gold_per_point(event_name):
 
 
 def npc_traits():
-    """npc id -> traits, one pass over the catalog."""
+    """npc id -> traits (+ grand alliance as a pseudo-trait), datamine catalog.
+
+    The game's traitRestrictions match alliances too (warp surge's
+    `allowed:["Chaos"]` is GrandAllianceId, never a trait), so the alliance
+    rides along in the trait list; no existing event's needs/skip names one.
+    """
+    f = DATA / "datamine" / "raw" / "gameconfig" / "units" / "npc.json"
     out = {}
-    for f in sorted((DATA / "npcs").glob("*.json")):
-        for n in json.load(open(f))["npcs"]:
-            out[n["id"]] = n.get("traits") or []
+    for i, n in json.load(open(f)).items():
+        t = list(n.get("traits") or [])
+        if n.get("GrandAllianceId"):
+            t.append(n["GrandAllianceId"])
+        out[i] = t
     return out
 
 
@@ -207,7 +252,7 @@ def token_rows(now):
 
 def _occurrences():
     """(definitionId, start, end) for every planned occurrence (planner events data)."""
-    f = DATA / "events" / "event-occurrences.json"
+    f = DATA / "curated" / "event-occurrences.json"
     if not f.exists():
         return []
     out = []
@@ -242,7 +287,7 @@ def legendary_cycle(now):
     derive it: anchorUtc + k*intervalDays, durationDays long. Calibrated against
     the in-game countdown 2026-10-04 (Oct 4 00:00Z -> Oct 11 00:00Z = 6d 16h).
     """
-    f = DATA / "events" / "event-definitions.json"
+    f = DATA / "curated" / "event-definitions.json"
     if not f.exists():
         return None
     d = next((x for x in json.load(open(f))
@@ -268,63 +313,72 @@ def event_list(now, cap=4):
     """
     evs = [(d, s, e) for d, s, e in _occurrences() if e >= now]
     cyc = legendary_cycle(now)
-    if cyc:
+    # curated occurrences now carry their own legendary-event row - only fall
+    # back to the derived cycle when none is upcoming (avoids the double line)
+    if cyc and not any(d == "legendary-event" for d, _, _ in evs):
         evs.append(("legendary-event", cyc[0], cyc[1]))
     evs.sort(key=lambda e: (e[1] > now, e[1]))
     return [{"id": d, "start": s.isoformat(), "end": e.isoformat(),
              "live": s <= now <= e} for d, s, e in evs[:cap]]
 
 
-def battle_xp():
-    """(campaignId, battleId) -> xp awarded, from gameconfig campaigns.
+def nodes(event, att):
+    """One row per node whose kills score: {campaign, id, kills, foes, xp, ...}.
 
-    ponytail: the 20 MB gameconfig is parsed once per run, and only when the
-    event pays XP at all. battleId is a string and not always numeric ("03B"),
-    so it is keyed as-is; a node with no gameconfig twin (the event-vs
-    campaigns) simply stays None and prints as `?`.
+    Built from the datamine `battles/campaigns.json` (difficulty buckets of
+    campaign groups) + `curated/campaign-curation.json` (group -> node-id
+    prefix). Enemies = every team whose paired player-team id != 1 (1 fights
+    with the player); entries without a numeric index are board power-ups.
     """
-    if not GAMECONFIG.exists():
-        return {}
-    camps = json.load(open(GAMECONFIG))["clientGameConfig"]["battles"]["campaigns"]
-    return {(c["id"], b["battleId"]): b.get("xp")
-            for group in camps.values() for c in group for b in c["battles"]}
-
-
-def nodes(event, att, xp_of):
-    """One row per node whose kills score: {campaign, id, kills, foes, xp, ...}."""
     if EVENTS[event].get("wave_modes"):
         return []                       # waves, not campaign kills - no nodes
     score = countable(npc_traits(), event)
-    rates = sorted(kill_rates(EVENTS[event]["tier"]))
-    elite = rates[-1]                       # the higher rate IS the elite one
+    std_rate, elite_rate = campaign_rates(EVENTS[event]["tier"])
+    camps = json.load(open(DATA / "datamine" / "raw" / "gameconfig"
+                           / "battles" / "campaigns.json"))
+    by_id = {g["id"]: (diff, g) for diff, gs in camps.items() for g in gs}
+    cur = json.load(open(DATA / "curated" / "campaign-curation.json"))
     rows = []
-    for f in sorted((DATA / "campaign-battles").glob("*.json")):
-        camp = f.stem[len("campaign-battles-"):]
-        doc = json.load(open(f))
-        for b in doc["battles"]:
-            raw = b.get("rawEnemyTypes") or [
-                {"id": e["id"], "count": e["count"]}
-                for e in b.get("detailedEnemyTypes", [])
-            ]
-            k = sum(e["count"] for e in raw if e["id"].split(":")[0] in score)
-            if not k:
-                continue
-            rew = b.get("rewards") or {}
-            drops = list(dict.fromkeys(  # same leaf can sit in both reward lists
-                p["id"]
-                for side in ("potential", "guaranteed")
-                for p in (rew.get(side) or [])
-                if str(p.get("id", "")).startswith("upg")
-            ))
-            rows.append({
-                "campaign": camp, "id": b["id"], "type": b.get("type", ""),
-                "energy": b["energyCost"], "kills": k,
-                "foes": sum(e["count"] for e in raw), "drops": drops,
-                "xp": xp_of.get((doc.get("groupId"), f"{b['nodeNumber']:02d}")),
-                "pts": (elite if b.get("type") in ("Elite", "EliteMirror")
-                        else rates[0]) * k,
-                "att": att.get((doc.get("groupId"), b["nodeNumber"] - 1)),
-            })
+    for key in sorted(cur):
+        if not key.startswith("campaign-battles-"):
+            continue
+        camp = key[len("campaign-battles-"):]
+        for spec in cur[key].get("campaigns") or []:
+            diff, g = by_id[spec["campaign"]]
+            prefix = spec["battleIdPrefix"]
+            for idx, b in enumerate(g["battles"]):
+                counts = {}
+                for team, tid in zip(b.get("units") or [],
+                                     b.get("playerTeams") or []):
+                    if tid == 1:
+                        continue        # fights with the player
+                    for u in team:
+                        if ":" not in u:
+                            continue    # board power-up / blank slot
+                        nid, _, i2 = u.partition(":")
+                        if nid and i2.isdigit():
+                            counts[nid] = counts.get(nid, 0) + 1
+                k = sum(c for nid, c in counts.items() if nid in score)
+                if not k:
+                    continue
+                bid = b["battleId"]
+                node_id = (prefix + "C" + bid.lstrip("0") if "B" in bid
+                           else prefix + bid)
+                loot = b.get("loot") or {}
+                base = [s.split(":")[0] for s in (loot.get("base") or [])]
+                chance = (loot.get("chanceOf") or "").split("%")[0]
+                drops = list(dict.fromkeys(
+                    [s for s in base if s.startswith("upg")]
+                    + ([chance] if chance.startswith("upg") else [])))
+                rows.append({
+                    "campaign": camp, "id": node_id, "type": diff,
+                    "energy": b.get("staminaCost") or 0, "kills": k,
+                    "foes": sum(counts.values()), "drops": drops,
+                    "xp": b.get("xp"),
+                    "pts": (elite_rate if diff in ("Elite", "EliteMirror")
+                            else std_rate) * k,
+                    "att": att.get((g["id"], idx)),
+                })
     return rows
 
 
@@ -356,38 +410,42 @@ def wanted():
 
 def selftest():
     att = attempts()
-    xp_of = battle_xp()
-    assert len(xp_of) > 1300, len(xp_of)
     now = datetime.now(timezone.utc)
-    mech = nodes("machine-hunt", att, xp_of)
-    rush = nodes("training-rush", att, xp_of)
+    mech = nodes("machine-hunt", att)
+    rush = nodes("training-rush", att)
+    warp = nodes("warp-surge", att)
     assert len(mech) >= 250, len(mech)
     # training rush scores every kill, so it can only ever have more nodes
     assert len(rush) > len(mech)
     assert len(countable(npc_traits(), "machine-hunt")) >= 90
-    for rows in (mech, rush):
+    for rows in (mech, rush, warp):
         assert all(0 < r["kills"] <= r["foes"] and r["energy"] >= 0 for r in rows)
         assert all(r["pts"] > 0 for r in rows)
-    # the 5-pt rate is elite-only, the 3-pt rate the rest
+    # the 5-pt rate is elite-only, the 3-pt rate the rest (PvP's 25 never
+    # reaches a campaign row)
     for r in rush:
         per = r["pts"] / r["kills"]
         assert per == (5 if r["type"] in ("Elite", "EliteMirror") else 3), r
+    assert warp and all(r["pts"] / r["kills"]
+                        == (5 if r["type"] in ("Elite", "EliteMirror") else 3)
+                        for r in warp)
     assert len(att) >= 500 and all(v >= 0 for v in att.values())
-    # permanent campaigns resolve attempts AND xp; event campaigns resolve neither
+    # permanent campaigns resolve attempts AND xp; event campaigns resolve
+    # attempts and (from the datamine, which carries the current slot's
+    # content) xp too
     perm = [r for r in rush if r["campaign"] in ("indomitus", "octarius")]
     assert perm and all(r["att"] is not None and r["xp"] for r in perm)
-    assert all(r["xp"] is None for r in rush if "vs-" in r["campaign"])
+    assert all(r["xp"] for r in rush if "vs-" in r["campaign"])
     indo = [r for r in mech if r["campaign"] == "indomitus"]
     assert any(r["kills"] == r["foes"] for r in indo)  # pure-Necron nodes
     for name, evd in EVENTS.items():
         if evd.get("wave_modes"):
             continue                    # no killUnits trackers (asserted below)
-        rates = kill_rates(evd["tier"])
-        assert rates == {3, 5}, (name, rates)
+        assert campaign_rates(evd["tier"]) == (3, 5), name
         assert gold_per_point(evd["tier"])
         assert reward_ladder(evd["progress"]), name
     # against the tide: 1 pt/wave, token lines from the snapshot, ladder present
-    assert nodes("against-the-tide", att, xp_of) == []
+    assert nodes("against-the-tide", att) == []
     assert kill_rates(EVENTS["against-the-tide"]["tier"]) == {1}
     assert gold_per_point(EVENTS["against-the-tide"]["tier"]) == 200  # not 3 like the kill events
     assert reward_ladder(EVENTS["against-the-tide"]["progress"])
@@ -403,8 +461,9 @@ def selftest():
     assert w and all(sum(v.values()) > 0 for v in w.values())
     cat = energy_cost.load_upgrades()
     assert all(i in cat and cat[i].get("label") for i in w)  # every wanted leaf is named
-    print(f"selftest OK: {len(mech)} machine-hunt / {len(rush)} training-rush nodes, "
-          f"{len(xp_of)} xp rows, {len(att)} attempt slots, {len(w)} wanted leaves")
+    print(f"selftest OK: {len(mech)} machine-hunt / {len(rush)} training-rush / "
+          f"{len(warp)} warp-surge nodes, {len(att)} attempt slots, "
+          f"{len(w)} wanted leaves")
 
 
 def wave_main(event, a, now, ends):
@@ -477,7 +536,7 @@ def main():
     event = a.event if a.event != "auto" else live_event(now)
     ev = EVENTS[event]
     xs = xs_mult(ev["tier"])
-    rows = nodes(event, attempts(), battle_xp() if xs else {})
+    rows = nodes(event, attempts())
     ends = event_window(now, event)
     if ev.get("wave_modes"):
         return wave_main(event, a, now, ends)
@@ -532,7 +591,7 @@ def main():
         left = ends - now
         print(f"{ev['label']} LIVE — ends {ends:%Y-%m-%d %H:%M} UTC "
               f"({left.days}d {left.seconds // 3600}h left)")
-    who = ("Mechanical kills" if ev["needs"]
+    who = (f"{'+'.join(sorted(ev['needs']))} kills" if ev["needs"]
            else f"Kills (skip {'/'.join(sorted(ev['skip']))})")
     sortnote = ("xp/E" if a.xp_needed else "Pt/E")
     print(f"{who} per energy — {sortnote} first; "

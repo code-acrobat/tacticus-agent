@@ -11,7 +11,9 @@ recurrence via home_screen_event.event_list) and the machine-hunt overlap (beta
 fights machines while that event is live).
 
 Usage:  python3 lres_report.py [alpha|beta|gamma] [--json] [--selftest]
-Reads:  research/.../lres/lres-votanuthar.json + units + campaign-battles,
+Reads:  lres-uthar.json (committed snapshot of the planner's served Uthar LRES
+        file, deleted upstream in the 2026-11 datamine migration) + datamine
+        lineup/abilities/npc + campaigns + curated/campaign-curation,
         tacticus-player.json (lanes progress, campaign attempts), power_delta.py.
 """
 import argparse
@@ -22,9 +24,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from rank_up_report import MOW_IDS
+
 HERE = Path(__file__).resolve().parent
 DATA = HERE / "research/tacticus-planner-api/src/TacticusPlanner.GameCatalog/Data"
-LRES_FILE = DATA / "lres/lres-votanuthar.json"
+RAW = DATA / "datamine" / "raw" / "gameconfig"
+LRES_FILE = HERE / "lres-uthar.json"
 EVENT_ID = "votanUthar"
 ALL_LANES = ("alpha", "beta", "gamma")
 # lane alliance exclusion: track -> grandAlliance you may NOT field
@@ -50,21 +55,33 @@ def load_player():
 
 
 def catalog():
-    """planner characters: id -> traits / hits / damage types."""
+    """datamine lineup + abilities: id -> traits / hits / damage types.
+
+    Weapons: first entry melee (no Range), one with Range = ranged (same rule
+    as the planner's UnitDatamineReader). Ability damage profiles live in
+    abilities.json constants under damageProfile[_N].
+    """
+    lineup = json.load(open(RAW / "units" / "lineup.json"))
+    abilities = json.load(open(RAW / "units" / "abilities.json"))
     cat = {}
-    for f in sorted((DATA / "units").glob("units-*.json")):
-        for c in json.load(open(f)).get("characters", []):
-            dmg = set()
-            for k in ("meleeDamage", "rangedDamage"):
-                if c.get(k):
-                    dmg.add(c[k])
-            for k in ("activeAbilityDamage", "passiveAbilityDamage"):
-                for d in (c.get(k) or []):
-                    dmg.add(d)
-            cat[c["id"]] = {"traits": set(c.get("traits") or []),
-                            "melee": c.get("meleeHits") or 0,
-                            "ranged": c.get("rangedHits") or 0,
-                            "dmg": dmg}
+    for uid, c in lineup.items():
+        if not isinstance(c, dict) or uid in MOW_IDS:
+            continue                      # MoWs are not LRE lane units
+        weapons = [w for w in (c.get("weapons") or [])
+                   if isinstance(w, dict)]
+        melee = next((w for w in weapons if w.get("Range") is None), {})
+        ranged = next((w for w in weapons if w.get("Range") is not None), None)
+        dmg = {w["DamageProfile"] for w in (melee, ranged)
+               if isinstance(w, dict) and w.get("DamageProfile")}
+        for aid in (list(c.get("activeAbilities") or [])
+                    + list(c.get("passiveAbilities") or [])):
+            consts = (abilities.get(aid) or {}).get("constants") or {}
+            dmg |= {v for k, v in consts.items()
+                    if k == "damageProfile" or k.startswith("damageProfile_")}
+        cat[uid] = {"traits": set(c.get("traits") or []),
+                    "melee": melee.get("hits") or 0,
+                    "ranged": (ranged or {}).get("hits") or 0,
+                    "dmg": dmg}
     return cat
 
 
@@ -167,27 +184,50 @@ def farm_rows(player, missions, cap=3):
     """Best campaign nodes per mission: (kills/run x attempts) / energy."""
     att = {(c["id"], b["battleIndex"]): b["attemptsLeft"]
            for c in player["progress"]["campaigns"] for b in c["battles"]}
+    camps = json.load(open(RAW / "battles" / "campaigns.json"))
+    by_id = {g["id"]: g for gs in camps.values() for g in gs}
+    cur = json.load(open(DATA / "curated" / "campaign-curation.json"))
+    npc = json.load(open(RAW / "units" / "npc.json"))
+    nodes = []
+    for key in sorted(cur):
+        if not key.startswith("campaign-battles-"):
+            continue
+        for spec in cur[key].get("campaigns") or []:
+            g = by_id[spec["campaign"]]
+            for idx, b in enumerate(g["battles"]):
+                fr, fa, kills = set(), set(), 0
+                for team, tid in zip(b.get("units") or [],
+                                     b.get("playerTeams") or []):
+                    if tid == 1:
+                        continue          # fights with the player
+                    for u in team:
+                        if ":" not in u:
+                            continue
+                        nid, _, i2 = u.partition(":")
+                        if not (nid and i2.isdigit()) or nid not in npc:
+                            continue
+                        kills += 1
+                        n = npc[nid]
+                        if n.get("FactionId"):
+                            fr.add(norm(n["FactionId"]))
+                        if n.get("GrandAllianceId"):
+                            fa.add(norm(n["GrandAllianceId"]))
+                if kills:
+                    nodes.append((g["id"], idx, b, fr, fa, kills))
     for mis in missions:
         rows = []
-        for f in sorted((DATA / "campaign-battles").glob("*.json")):
-            doc = json.load(open(f))
-            camp = doc.get("groupId", f.stem)
-            for b in doc["battles"]:
-                fr = [norm(x) for x in (b.get("enemiesFactions") or [])]
-                fa = [norm(x) for x in (b.get("enemiesAlliances") or [])]
-                hit = (any(mis["key"] in x for x in fr) if mis["mode"] == "faction"
-                       else mis["key"] in fa)
-                if not hit:
-                    continue
-                left = att.get((camp, b.get("nodeNumber")))
-                if not left:
-                    continue
-                kills = sum(e["count"] for e in (b.get("rawEnemyTypes") or []))
-                e = b.get("energyCost") or 6
-                if kills:
-                    rows.append({"camp": camp, "node": b.get("nodeNumber"),
-                                 "per_run": kills, "att": left, "energy": e,
-                                 "score": kills * left / e})
+        for camp, idx, b, fr, fa, kills in nodes:
+            hit = (any(mis["key"] in x for x in fr) if mis["mode"] == "faction"
+                   else mis["key"] in fa)
+            if not hit:
+                continue
+            left = att.get((camp, idx))
+            if not left:
+                continue
+            e = b.get("staminaCost") or 6
+            rows.append({"camp": camp, "node": idx + 1,
+                         "per_run": kills, "att": left, "energy": e,
+                         "score": kills * left / e})
         rows.sort(key=lambda r: -r["score"])
         mis["rows"] = rows[:cap]
     return missions

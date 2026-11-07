@@ -48,10 +48,10 @@ Model
                 (Bellator, Calgar, Burchard, Nubari) -> pure armour, everyone
                 else hp+armour. A signal, not an order.
 
-Faction/unit locks come from the planner catalog (research/tacticus-planner-api
-Data/equipment/*.json -> allowedFactions / allowedUnits); an empty list means
-unrestricted. Gear is never crafted and campaigns drop essentially none, so
-there is no "farm" column here.
+Faction/unit locks come from the datamine equipment catalog
+(research/.../datamine/raw/gameconfig/items.json -> allowedFactions /
+allowedUnits); an empty list means unrestricted. Gear is never crafted and
+campaigns drop essentially none, so there is no "farm" column here.
 
 Usage:
     python3 gear_report.py                   # full roster table (pipe to fzf)
@@ -70,8 +70,13 @@ from rank_up_report import MOW_IDS, load_player, rank_name, run
 BASE = pathlib.Path(__file__).resolve().parent
 GAMECONFIG = BASE / "research" / "datamine" / "gameconfig142.json"
 SHOP_PRICES = BASE / "tacticus-shop-prices.json"
-EQUIP_DIR = (BASE / "research" / "tacticus-planner-api" / "src"
-             / "TacticusPlanner.GameCatalog" / "Data" / "equipment")
+ITEMS_FILE = (BASE / "research" / "tacticus-planner-api" / "src"
+              / "TacticusPlanner.GameCatalog" / "Data" / "datamine" / "raw"
+              / "gameconfig" / "items.json")
+# served-name renames the planner applies to raw stats (SKILL.md)
+STAT_RENAME = {"critDmg": "critDamage", "critDmgBonus": "critDamageBonus",
+               "blockDmg": "blockDamage", "blockDmgBonus": "blockDamageBonus",
+               "fixedArmor": "armor"}
 CC = "clientGameConfig"
 
 RARITY = ("Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic")
@@ -122,19 +127,34 @@ def load_config():
 
 
 def load_catalog():
-    """Planner equipment catalog: type, faction/unit locks, isRelic."""
-    if not EQUIP_DIR.exists():
-        sys.exit(f"error: {EQUIP_DIR} missing - see research/README.md")
+    """Equipment catalog from the datamine items.json (dict id -> entry).
+
+    Normalized to what the rest of this file expects: `type` = itemType, the
+    five raw stat names renamed to the served ones (variant() reads `armor`),
+    absent locks/relic flags defaulted.
+    """
+    if not ITEMS_FILE.exists():
+        sys.exit(f"error: {ITEMS_FILE} missing - see research/README.md")
+    try:
+        raw = json.loads(ITEMS_FILE.read_text())
+    except json.JSONDecodeError as error:
+        sys.exit(f"error: {ITEMS_FILE} is not valid JSON: {error}")
     catalog = {}
-    for path in sorted(EQUIP_DIR.glob("*.json")):
-        try:
-            entries = json.loads(path.read_text())
-        except json.JSONDecodeError as error:
-            sys.exit(f"error: {path} is not valid JSON: {error}")
-        for entry in entries if isinstance(entries, list) else []:
-            catalog[entry.get("id")] = entry
+    for iid, entry in raw.items():
+        if not isinstance(entry, dict):
+            continue
+        item = dict(entry, id=iid, type=entry.get("itemType") or "",
+                    allowedFactions=entry.get("allowedFactions") or [],
+                    allowedUnits=entry.get("allowedUnits") or [],
+                    isRelic=bool(entry.get("isRelic")))
+        for level in item.get("levels") or []:
+            stats = level.get("stats")
+            if isinstance(stats, dict):
+                level["stats"] = {STAT_RENAME.get(k, k): v
+                                  for k, v in stats.items()}
+        catalog[iid] = item
     if not catalog:
-        sys.exit(f"error: no equipment entries under {EQUIP_DIR}")
+        sys.exit(f"error: no equipment entries in {ITEMS_FILE}")
     return catalog
 
 

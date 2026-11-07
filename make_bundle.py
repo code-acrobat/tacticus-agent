@@ -5,7 +5,7 @@ Everything the witness CLIs open at runtime, mirrored at repo-root layout so
 BASE = Path(__file__).parent keeps working after extraction:
 
     *.py, event-config.js, tacticus-drop-rates.json,
-    tacticus-shop-prices.json,
+    tacticus-shop-prices.json, lres-uthar.json,
     research/tacticus-planner-api/.../Data/**, research/datamine/gameconfig142.json,
     research/misc/bundle.js  (the liveEventConfig blocks home_screen_event reads)
 
@@ -71,7 +71,8 @@ def members():
     for p in sorted(BASE.glob("*.py")):
         if p.name not in FORBIDDEN:
             yield p
-    for name in ("tacticus-drop-rates.json", "tacticus-shop-prices.json"):
+    for name in ("tacticus-drop-rates.json", "tacticus-shop-prices.json",
+                 "lres-uthar.json"):
         yield BASE / name
     data = (BASE / "research" / "tacticus-planner-api" / "src" /
             "TacticusPlanner.GameCatalog" / "Data")
@@ -97,6 +98,7 @@ def main():
     bad = [n for n in names if pathlib.Path(n).name in FORBIDDEN]
     assert not bad, f"forbidden files leaked: {bad}"
     assert "research/datamine/gameconfig142.json" in names
+    assert "lres-uthar.json" in names, "LRES snapshot missing - lres_report dies in-browser"
     assert arc in names, "slim bundle.js missing - home_screen_event dies in-browser"
     assert any(n.startswith("research/tacticus-planner-api/") for n in names), (
         "planner Data missing - research/ not fetched?")

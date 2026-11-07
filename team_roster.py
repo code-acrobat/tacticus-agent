@@ -43,8 +43,8 @@ from rank_up_report import MOW_IDS, load_player, rank_name, run
 BASE = pathlib.Path(__file__).resolve().parent
 DATA = (BASE / "research" / "tacticus-planner-api" / "src" /
         "TacticusPlanner.GameCatalog" / "Data")
-COMPS_FILE = DATA / "guild-raid-meta" / "guild-raid-comps.json"
-UNITS_DIR = DATA / "units"
+COMPS_FILE = DATA / "curated" / "guild-raid-meta" / "guild-raid-comps.json"
+UNITS_FILE = DATA / "datamine" / "raw" / "gameconfig" / "units" / "lineup.json"
 
 TEAM_SIZE = 5                  # heroes per raid team (plus 1 machine of war)
 VERDICTS = ("fieldable", "no signature", "thin")
@@ -67,15 +67,14 @@ def load_comps():
         sys.exit(f"error: cannot read {COMPS_FILE}: {error}")
 
     names = {}
-    if UNITS_DIR.is_dir():
-        for path in sorted(UNITS_DIR.glob("units-*.json")):
-            try:
-                doc = json.loads(path.read_text())
-            except (json.JSONDecodeError, OSError):
-                continue
-            for unit in doc.get("characters") or []:
-                if unit.get("id") and unit.get("name"):
-                    names[unit["id"]] = unit["name"]
+    if UNITS_FILE.is_file():
+        try:
+            lineup = json.loads(UNITS_FILE.read_text())
+        except (json.JSONDecodeError, OSError):
+            lineup = {}
+        for unit_id, unit in lineup.items():
+            if isinstance(unit, dict) and unit.get("name"):
+                names[unit_id] = unit["name"]
     return {
         "source": raw.get("sourceId") or "unknown source",
         "updated": raw.get("updatedOn") or "?",
