@@ -20,6 +20,7 @@ import json
 import re
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -161,14 +162,21 @@ def event_window():
 
 
 def mission_targets(lres):
-    """Defeat-N missions -> farm keys (skips waves/damage/ability missions)."""
-    pats = [  # 'Defeat 30 Necrons'  |  'Defeat 30 enemies with Chaos units'
-        re.compile(r"Defeat\s+(\d+)\s+([A-Za-z ]+)$"),
-        re.compile(r"Defeat\s+(\d+)\s+enemies with\s+([A-Za-z]+) units$"),
+    """Defeat-N missions -> farm keys (skips waves/damage/ability missions).
+
+    The two shapes mean opposite things, and only one of them is about the
+    enemies you farm:
+      'Defeat 100 Dark Angels'             -> kill them (enemy side)
+      'Defeat 30 enemies with Chaos units' -> field Chaos units (your side)
+    """
+    pats = [  # (pattern, which side the label describes)
+        (re.compile(r"Defeat\s+(\d+)\s+([A-Za-z ]+)$"), "enemy"),
+        (re.compile(r"Defeat\s+(\d+)\s+enemies with\s+([A-Za-z]+) units$"),
+         "team"),
     ]
     out, seen = [], set()
     for s in lres.get("regularMissions", []) + lres.get("premiumMissions", []):
-        for pat in pats:
+        for pat, against in pats:
             m = pat.match(s.strip())
             if not m:
                 continue
@@ -179,13 +187,19 @@ def mission_targets(lres):
                 seen.add(label)
                 mode, key = FARM_KEY[label.lower()]
                 out.append({"need": int(m.group(1)), "label": label,
-                            "mode": mode, "key": key})
+                            "against": against, "mode": mode, "key": key})
             break
     return out
 
 
 def farm_rows(player, missions, cap=3):
-    """Best campaign nodes per mission: (kills/run x attempts) / energy."""
+    """Best campaign nodes per mission: (credited kills/run x attempts) / energy.
+
+    A kill mission only credits the enemies it names, so `per_run` counts the
+    matching enemies - not everything on the board. A field mission ('enemies
+    with X units') credits every kill as long as you field X, so it picks on
+    kills alone and never filters by the enemies present.
+    """
     att = {(c["id"], b["battleIndex"]): b["attemptsLeft"]
            for c in player["progress"]["campaigns"] for b in c["battles"]}
     camps = json.load(open(RAW / "battles" / "campaigns.json"))
@@ -199,7 +213,7 @@ def farm_rows(player, missions, cap=3):
         for spec in cur[key].get("campaigns") or []:
             g = by_id[spec["campaign"]]
             for idx, b in enumerate(g["battles"]):
-                fr, fa, kills = set(), set(), 0
+                fr, fa, kills = Counter(), Counter(), 0
                 for team, tid in zip(b.get("units") or [],
                                      b.get("playerTeams") or []):
                     if tid == 1:
@@ -213,25 +227,29 @@ def farm_rows(player, missions, cap=3):
                         kills += 1
                         n = npc[nid]
                         if n.get("FactionId"):
-                            fr.add(norm(n["FactionId"]))
+                            fr[norm(n["FactionId"])] += 1
                         if n.get("GrandAllianceId"):
-                            fa.add(norm(n["GrandAllianceId"]))
+                            fa[norm(n["GrandAllianceId"])] += 1
                 if kills:
                     nodes.append((g["id"], idx, b, fr, fa, kills))
     for mis in missions:
         rows = []
         for camp, idx, b, fr, fa, kills in nodes:
-            hit = (any(mis["key"] in x for x in fr) if mis["mode"] == "faction"
-                   else mis["key"] in fa)
-            if not hit:
-                continue
+            if mis["against"] == "team":
+                per = kills                # you field the units; any kill counts
+            else:
+                src = fr if mis["mode"] == "faction" else fa
+                per = sum(n for k, n in src.items() if mis["key"] in k)
+                if not per:
+                    continue
             left = att.get((camp, idx))
             if not left:
                 continue
             e = b.get("staminaCost") or 6
             rows.append({"camp": camp, "node": idx + 1,
-                         "per_run": kills, "att": left, "energy": e,
-                         "score": kills * left / e})
+                         "per_run": per, "board": kills,
+                         "att": left, "energy": e,
+                         "score": per * left / e})
         rows.sort(key=lambda r: -r["score"])
         mis["rows"] = rows[:cap]
     return missions
@@ -464,11 +482,12 @@ def report(d):
                   f"full-clear ~{r['full_clear']:,} pts")
 
     print("\n" + "=" * 78)
-    print("MISSION FARMING (Defeat-N missions -> best campaign nodes)")
+    print("MISSION FARMING (Defeat-N missions -> best campaign nodes; "
+          "'team' = field those units, any kill counts)")
     for mis in d["missions"]:
         top = "; ".join(f"{r['camp']}#{r['node']} {r['per_run']}/run "
                         f"x{r['att']} att ({r['energy']}E)" for r in mis["rows"])
-        print(f"  {mis['need']:>4} {mis['label']:<12} -> "
+        print(f"  {mis['need']:>4} {mis['label']:<12} {mis['against']:<5} -> "
               f"{top or 'no attempts left (kills also count in event battles)'}")
 
 
@@ -489,6 +508,13 @@ def main(argv=None):
                 assert L["team"] and L["ladder"] and L["pools"] \
                     and "wall" in L["power"]
         assert d["missions"] and all("rows" in m for m in d["missions"])
+        for m in d["missions"]:
+            assert m["against"] in ("enemy", "team")
+            for r in m["rows"]:
+                if m["against"] == "team":
+                    assert r["per_run"] == r["board"]   # every kill credits
+                else:
+                    assert 0 < r["per_run"] <= r["board"]  # only the named ones
         print(f"selftest PASS ({len(d['lanes'])} lane(s), "
               f"{len(d['missions'])} farm missions)")
         return 0
