@@ -79,26 +79,40 @@ def _selftest():
     bundle = here / "dist" / "bundle.tar.gz"
     if not bundle.exists():
         subprocess.run([sys.executable, str(here / "make_bundle.py")], check=True)
-    player = (here / "tacticus-player.json").read_text()
-    cases = [
-        ["rank_up_report.py", "--energy", "--json", "--top", "5"],
-        ["next_step.py", "--json", "--top", "3"],
-        ["home_screen_event.py", "--json", "--top", "5"],
-    ]
-    # ground truth first: real subprocess from the repo tree
-    truth = [subprocess.run([sys.executable, str(here / c[0])] + c[1:],
-                            capture_output=True, text=True) for c in cases]
-    import tempfile
-    with tempfile.TemporaryDirectory() as td:
-        bootstrap(bundle.read_bytes(), player, td)
-        install()
-        for case, want in zip(cases, truth):
-            got = run_cli(case[0], case[1:])
-            assert got.returncode == want.returncode, (
-                f"{case[0]} rc {got.returncode} != {want.returncode}: {got.stderr}")
-            assert got.stdout == want.stdout, f"{case[0]} stdout differs"
-            print(f"ok  {case[0]} {' '.join(case[1:])}")
-    print("SELFTEST PASS")
+    # CI has no roster (gitignored): stand a synthetic one in for the run so
+    # truth and the bundled copy both execute, then remove it — a fresh clone
+    # must keep erroring on a missing snapshot. campaigns:[] keeps
+    # home_screen_event's attempts() happy while still reaching npc_traits().
+    pfile = here / "tacticus-player.json"
+    made = not pfile.exists()
+    if made:
+        pfile.write_text('{"player":{"progress":{"campaigns":[]},'
+                         '"inventory":{},"units":[]},"metaData":{}}')
+    try:
+        player = pfile.read_text()
+        cases = [
+            ["rank_up_report.py", "--energy", "--json", "--top", "5"],
+            ["next_step.py", "--json", "--top", "3"],
+            ["home_screen_event.py", "--json", "--top", "5"],
+        ]
+        # ground truth first: real subprocess from the repo tree
+        truth = [subprocess.run([sys.executable, str(here / c[0])] + c[1:],
+                                capture_output=True, text=True) for c in cases]
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            bootstrap(bundle.read_bytes(), player, td)
+            install()
+            for case, want in zip(cases, truth):
+                got = run_cli(case[0], case[1:])
+                assert got.returncode == want.returncode, (
+                    f"{case[0]} rc {got.returncode} != {want.returncode}: "
+                    f"{got.stderr}")
+                assert got.stdout == want.stdout, f"{case[0]} stdout differs"
+                print(f"ok  {case[0]} {' '.join(case[1:])}")
+        print("SELFTEST PASS")
+    finally:
+        if made:
+            pfile.unlink()
 
 
 if __name__ == "__main__":
