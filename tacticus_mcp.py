@@ -299,10 +299,11 @@ TOOLS = [
     },
     {
         "name": "lres_report",
-        "title": "Uthar LRES: teams, power walls, mission farms",
+        "title": "Legendary Release Event: teams, power walls, mission farms",
         "description": (
-            "The 'ancestors are watching' Legendary Release Event (unlock "
-            "Uthar): per lane (alpha/beta/gamma) the next uncleared battle, "
+            "The live Legendary Release Event (unlock the featured hero - "
+            "currently Fabius Bile): per lane (alpha/beta/gamma) the next "
+            "uncleared battle, "
             "its objectives, the best owned specialist team (locked heroes "
             "and wrong alliance excluded), per-specialisation pools of every "
             "owned coverer (alternatives; * = in lineup), power walls (first "

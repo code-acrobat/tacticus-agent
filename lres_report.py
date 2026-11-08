@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-"""The ancestors are watching (Uthar LRES): teams, power walls, mission farms.
+"""Legendary Release Event: teams, power walls, mission farms.
 
 Three tracks (alpha/beta/gamma), 18 battles each: lane objectives pay per-hero
-bonus points, milestones pay engram -> chests -> shards toward Uthar. Per lane
-this prints the next uncleared battle, the best owned specialist team, and the
-power ladder - your strongest allowed 5 vs each tier's difficulty, so you walk
-up to the wall instead of trying it early or farming a low-point tier. Also
-prints the event window (derived from the planner's Fixed legendary-event
-recurrence via home_screen_event.event_list) and the machine-hunt overlap (beta
-fights machines while that event is live).
+bonus points, milestones pay engram -> chests -> shards toward the featured
+hero. Per lane this prints the next uncleared battle, the best owned specialist
+team, and the power ladder - your strongest allowed 5 vs each tier's difficulty,
+so you walk up to the wall instead of trying it early or farming a low-point
+tier. Also prints the event window (derived from the planner's Fixed
+legendary-event recurrence via home_screen_event.event_list).
 
 Usage:  python3 lres_report.py [alpha|beta|gamma] [--json] [--selftest]
-Reads:  lres-uthar.json (committed snapshot of the planner's served Uthar LRES
-        file, deleted upstream in the 2026-11 datamine migration) + datamine
-        lineup/abilities/npc + campaigns + curated/campaign-curation,
-        tacticus-player.json (lanes progress, campaign attempts), power_delta.py.
+Reads:  lres-bile.json (committed snapshot of the Fabius Bile LRE, generated
+        from the raw datamine by gen_lres.py) + datamine lineup/abilities/npc +
+        campaigns + curated/campaign-curation, tacticus-player.json (lanes
+        progress, campaign attempts), power_delta.py.
 """
 import argparse
 import json
@@ -29,17 +28,16 @@ from rank_up_report import MOW_IDS
 HERE = Path(__file__).resolve().parent
 DATA = HERE / "research/tacticus-planner-api/src/TacticusPlanner.GameCatalog/Data"
 RAW = DATA / "datamine" / "raw" / "gameconfig"
-LRES_FILE = HERE / "lres-uthar.json"
-EVENT_ID = "votanUthar"
+LRES_FILE = HERE / "lres-bile.json"
 ALL_LANES = ("alpha", "beta", "gamma")
-# lane alliance exclusion: track -> grandAlliance you may NOT field
-EXCL_ALLIANCE = {"alpha": "Xenos", "beta": "Imperial", "gamma": "Chaos"}
 # "Defeat N <label>" mission -> how to farm it (alphanumeric-normalised match
 # over campaign node enemy factions / alliances)
 FARM_KEY = {
     "necrons": ("faction", "necrons"),
     "admechs": ("faction", "adeptusmechanicus"),
     "death guard": ("faction", "deathguard"),
+    "aeldari": ("faction", "aeldari"),
+    "dark angels": ("faction", "darkangels"),
     "chaos": ("alliance", "chaos"),
     "imperial": ("alliance", "imperial"),
     "xenos": ("alliance", "xenos"),
@@ -138,12 +136,18 @@ def obj_label(o):
     return lbl
 
 
-def allowed(uid, u, disallowed, track, owned):
+def barred_alliance(lres, track):
+    """The one whole alliance this lane may not field (its allowedUnitsFilter)."""
+    return next((f["target"] for f in lres[track]["allowedUnitsFilter"]
+                 if f["kind"] == "Alliance" and f.get("exclude")), None)
+
+
+def allowed(uid, u, disallowed, barred, owned):
     if uid not in owned or locked(u):
         return False
     if u["faction"] in disallowed:
         return False
-    return u["grandAlliance"] != EXCL_ALLIANCE[track]
+    return u["grandAlliance"] != barred
 
 
 def event_window():
@@ -240,8 +244,11 @@ def analyse(lane_filter=None):
     PW = hero_power()
     units = {u["id"]: u for u in player["units"]}
     owned = {i for i in units if i in cat}
+    barred = {t: barred_alliance(lres, t) for t in ALL_LANES}
+    # the snapshot names the hero it unlocks, which is also the id the player
+    # snapshot files the run under - so one file is the whole rotation switch
     ev = next(e for e in player["progress"]["legendaryEvents"]
-              if e["id"] == EVENT_ID)
+              if e["id"] == lres["unitSnowprintId"])
 
     # ---- event state -------------------------------------------------------
     left_ms = [m for m in lres["pointsMilestones"]
@@ -251,8 +258,8 @@ def analyse(lane_filter=None):
     need_chests = -(-shards_needed // lres["shardsPerChest"])  # ceil
     next_ms = left_ms[0] if left_ms else None
     meta = {
-        "event": "The ancestors are watching",
-        "unit": lres.get("unitSnowprintId", EVENT_ID),
+        "event": lres.get("name", "unknown"),
+        "unit": lres.get("unitSnowprintId", "unknown"),
         "window": event_window(),
         "points": ev["currentPoints"],
         "engram": ev["currentCurrency"],
@@ -275,7 +282,6 @@ def analyse(lane_filter=None):
             "chests_needed": need_chests,
             "engram_for_chests": need_chests * chest0["engramCost"],
         },
-        "machine_hunt_overlap": "beta fights machines - kills count for both",
     }
 
     # ---- lanes -------------------------------------------------------------
@@ -301,7 +307,7 @@ def analyse(lane_filter=None):
         scored = []
         for uid in owned:
             u = units[uid]
-            if not allowed(uid, u, disallowed, track, owned):
+            if not allowed(uid, u, disallowed, barred[track], owned):
                 continue
             pts, detail = 0, []
             for o in objs:
@@ -342,7 +348,8 @@ def analyse(lane_filter=None):
         # power ladder: objective team + strongest allowed 5 vs each tier
         battles = lres[track]["battles"]
         team_pw = sum(PW.get(t["id"], 0) for t in team)
-        pool = [uid for uid in owned if allowed(uid, units[uid], disallowed, track, owned)]
+        pool = [uid for uid in owned
+                if allowed(uid, units[uid], disallowed, barred[track], owned)]
         best5 = sorted(pool, key=lambda i: -PW.get(i, 0))[:5]
         best_pw = sum(PW.get(i, 0) for i in best5)
         wall = next((b["number"] for b in battles if b["power"] > best_pw), None)
@@ -387,7 +394,7 @@ def report(d):
     m = d["meta"]
     w = m.get("window")
     print("=" * 78)
-    head = "ANCESTORS ARE WATCHING (Uthar LRES)"
+    head = f"LEGENDARY RELEASE EVENT ({m['event']})"
     if w:
         fmt = "%Y-%m-%d %H:%M"
         s, e = datetime.fromisoformat(w["start"]), datetime.fromisoformat(w["end"])
@@ -463,8 +470,6 @@ def report(d):
                         f"x{r['att']} att ({r['energy']}E)" for r in mis["rows"])
         print(f"  {mis['need']:>4} {mis['label']:<12} -> "
               f"{top or 'no attempts left (kills also count in event battles)'}")
-    print("\nMACHINE-HUNT OVERLAP: " + d["meta"]["machine_hunt_overlap"])
-    print("for the live machine-hunt window, see next_step EVENTS / home_screen_event.py")
 
 
 def main(argv=None):

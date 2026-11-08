@@ -48,7 +48,7 @@ for marker in (
     'id="tools"',          # what-this-page-ships table
     'id="hunt"',           # Hunt nodes button
     "home_screen_event",  # its CLI reference
-    'id="lres"',           # Uthar event button
+    'id="lres"',           # LRE event button
     "lres_report",         # its CLI reference
     'id="shards"',         # Shard sources button
     'id="shardq"',         # its character input

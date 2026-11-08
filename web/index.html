@@ -69,7 +69,7 @@ the <a href="https://github.com/code-acrobat/tacticus-agent" rel="noopener">sour
   </select>
   <button id="hunt" type="button" disabled>Event nodes ⚔</button>
   <span class="note">runs <code>home_screen_event --event &lt;pick&gt; --items</code> in your browser — every scoring node ranked by event points per energy (wave events report your tokens + track instead)</span>
-  <button id="lres" type="button" disabled>Uthar event ⚔</button>
+  <button id="lres" type="button" disabled>Fabius Bile event ⚔</button>
   <span class="note">runs <code>lres_report</code> in your browser — next-battle teams, power walls, mission farms</span>
 </div>
 <div id="huntrow">
@@ -147,17 +147,17 @@ $('hunt').addEventListener('click', async () => {
   finally { busy = false; $('hunt').disabled = false; }
 });
 
-/* lres_report (Uthar LRES) runs in the same runtime — teams, walls, farms */
+/* lres_report (Fabius Bile LRE) runs in the same runtime — teams, walls, farms */
 let lresOn = false;
 $('lres').addEventListener('click', async () => {
-  if (lresOn) { $('lresout').hidden = true; $('lres').textContent = 'Uthar event ⚔'; lresOn = false; return; }
+  if (lresOn) { $('lresout').hidden = true; $('lres').textContent = 'Fabius Bile event ⚔'; lresOn = false; return; }
   if (busy || !booted) return;
   busy = true; $('lres').disabled = true;
   try {
-    status('building Uthar event report (lres_report)…');
+    status('building Fabius Bile event report (lres_report)…');
     $('lresout').textContent = await py.runPythonAsync('str(_h.run_cli("/tacticus/lres_report.py", []).stdout)');
     $('lresout').hidden = false;
-    $('lres').textContent = 'Hide Uthar event';
+    $('lres').textContent = 'Hide Fabius Bile event';
     lresOn = true;
     status('ready');
   } catch (e) { say(e); }
