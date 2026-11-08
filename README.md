@@ -1148,6 +1148,13 @@ Secrets apply immediately — no redeploy. The worker URL is
 `WORKER` const in `web/index.html`, so update it in the same change that renames
 the worker.
 
+**Worker deploys itself.** `.github/workflows/worker.yml` runs `npx wrangler
+deploy` on every push that touches `worker/**` (ESM syntax-checked first), so
+your `git pull && npx wrangler deploy` is now just the fallback. One-time repo
+secrets: `CLOUDFLARE_API_TOKEN` (token with *Edit Cloudflare Workers*) and
+`CLOUDFLARE_ACCOUNT_ID`. The three `LLM_*` worker secrets above are still set
+once by hand — the workflow never rewrites them.
+
 **Deploy.** Push to `main` → the `test` job runs first (byte-compile, MCP
 initialize smoke, `check_page.py` — well under a second) and gates the build →
 `pages.yml` re-fetches the gitignored `research/`
