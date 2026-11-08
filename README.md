@@ -1151,9 +1151,11 @@ the worker.
 **Deploy.** Push to `main` → the `test` job runs first (byte-compile, MCP
 initialize smoke, `check_page.py` — well under a second) and gates the build →
 `pages.yml` re-fetches the gitignored `research/`
-(planner pinned by `PLANNER_SHA`, gameconfig pinned by commit), runs
-`make_bundle.py`, publishes the three files. One-time repo setting:
-**Settings → Pages → Source: GitHub Actions**.
+(planner pinned by `PLANNER_SHA` — bump it on every research sync, or the
+build fails on the raw-datamine assert; gameconfig pinned by commit), runs
+`make_bundle.py` + the `browser_harness.py` selftest (bundle output must be
+byte-equal to a real subprocess run), publishes the three files. One-time repo
+setting: **Settings → Pages → Source: GitHub Actions**.
 
 **Two traps worth knowing:**
 

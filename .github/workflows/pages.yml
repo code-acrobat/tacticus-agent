@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: false
 env:
   # bump on every research sync (AGENTS.md "External data sync")
-  PLANNER_SHA: 6fa9eb9af1cf1074608f2071c26e1cd9521cf857
+  PLANNER_SHA: e5b9b8e1d808283cf4b840b7d24b255466a0793e
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -52,6 +52,8 @@ jobs:
           curl -fsSL -o research/datamine/gameconfig142.json \
             https://raw.githubusercontent.com/unrstuart/datamine_tacticus/73b9a64/gameconfig.1.42.json
       - run: python3 make_bundle.py
+      - name: Browser harness selftest (bundle output == subprocess truth)
+        run: python3 browser_harness.py
       - name: Assemble site
         run: |
           mkdir site

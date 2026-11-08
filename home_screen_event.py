@@ -56,6 +56,7 @@ import energy_cost  # noqa: E402
 HERE = Path(__file__).resolve().parent
 DATA = HERE / "research/tacticus-planner-api/src/TacticusPlanner.GameCatalog/Data"
 CLIENT_CFG = HERE / "research/misc/bundle.js"  # ships the liveEventConfig blocks
+BUNDLED_CFG = HERE / "event-config.js"         # committed slices of those blocks
 GAMECONFIG = HERE / "research/datamine/gameconfig142.json"
 
 # Per-event: which client tier config holds its trackers, which trait
@@ -112,17 +113,24 @@ def event_block(event_name):
     NOWHERE else — gameconfig's `loot.tieredProgressRewards` holds the same
     ladder but not the trackers. bundle.js is minified JS with unquoted keys,
     so targeted regexes beat a JSON parse. Each tier is delimited by the
-    `offers:` sibling that closes it (liveEventConfig -> ... -> rewards).
+    `offers:` sibling that closes it (liveEventConfig -> ... -> rewards) — or,
+    in the concatenated event-config.js slices, by the next tier.
     """
-    if not CLIENT_CFG.exists():
+    src = CLIENT_CFG if CLIENT_CFG.exists() else BUNDLED_CFG  # no research/?
+    if not src.exists():
         sys.exit(f"missing {CLIENT_CFG} — see research/README.md")
-    s = CLIENT_CFG.read_text(encoding="utf8", errors="replace")
+    s = src.read_text(encoding="utf8", errors="replace")
     i = s.find(f'eventName:"{event_name}"')
     if i < 0:
         return None
     start = s.rindex("liveEventConfig:{", 0, i)   # eventName is a field of it
     end = s.find(",offers:{", i)
-    return s[start:end if end > 0 else len(s)]
+    if end < 0:
+        # event-config.js concatenates the slices with "\n" and the offers tail
+        # sliced off, so the delimiter only exists in the full client bundle.
+        nxt = s.find("liveEventConfig:{", i)
+        end = nxt - 1 if nxt > 0 else len(s)     # drop the join separator
+    return s[start:end]
 
 
 def kill_rates(event_name):

@@ -102,6 +102,12 @@ def main():
     assert arc in names, "slim bundle.js missing - home_screen_event dies in-browser"
     assert any(n.startswith("research/tacticus-planner-api/") for n in names), (
         "planner Data missing - research/ not fetched?")
+    # the raw datamine is what the witnesses open at runtime; a stale
+    # PLANNER_SHA ships a pre-restructure layout that dies in-browser.
+    import home_screen_event
+    raw = str(home_screen_event.DATA.relative_to(BASE) / "datamine" / "raw")
+    assert any(n.startswith(raw + "/") for n in names), (
+        f"{raw} missing - is PLANNER_SHA in pages.yml pre-restructure?")
     assert any(n.endswith("rank_up_report.py") for n in names)
     print(f"{OUT}: {OUT.stat().st_size / 1e6:.1f} MB gz, {len(names)} files, "
           f"bundle.js {len(slim) / 1e3:.0f} KB ({len(tiers)} events: {', '.join(tiers)})")
