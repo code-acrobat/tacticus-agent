@@ -57,7 +57,7 @@ HERE = Path(__file__).resolve().parent
 DATA = HERE / "research/tacticus-planner-api/src/TacticusPlanner.GameCatalog/Data"
 CLIENT_CFG = HERE / "research/misc/bundle.js"  # ships the liveEventConfig blocks
 BUNDLED_CFG = HERE / "event-config.js"         # committed slices of those blocks
-GAMECONFIG = HERE / "research/datamine/gameconfig142.json"
+GAMECONFIG = HERE / "research/datamine/gameconfig144.json"
 
 # Per-event: which client tier config holds its trackers, which trait
 # restrictions decide whose kills count, and the planner occurrence to window
@@ -510,7 +510,7 @@ def wave_main(event, a, now, ends):
             print("Track: " + ", ".join(
                 f"{p:,}{'+' if e else ''} {r}" for p, r, e in ladder))
         else:
-            print("Track: unavailable (needs research/datamine/gameconfig142.json)")
+            print("Track: unavailable (needs research/datamine/gameconfig144.json)")
     if gpp:
         print(f"leftover points trade in for {gpp} gold each")
     if a.items or a.xp_needed:
@@ -644,7 +644,7 @@ def main():
             print("Track: " + ", ".join(
                 f"{p:,}{'+' if e else ''} {r}" for p, r, e in ladder))
         else:
-            print("Track: unavailable (needs research/datamine/gameconfig142.json)")
+            print("Track: unavailable (needs research/datamine/gameconfig144.json)")
     if gpp:
         print(f"leftover points trade in for {gpp} gold each")
     if a.items and any(r["want"] for r in rows):

@@ -49,8 +49,8 @@ jobs:
       - name: Fetch game config (pinned file)
         run: |
           mkdir -p research/datamine
-          curl -fsSL -o research/datamine/gameconfig142.json \
-            https://raw.githubusercontent.com/unrstuart/datamine_tacticus/73b9a64/gameconfig.1.42.json
+          curl -fsSL -o research/datamine/gameconfig144.json \
+            https://raw.githubusercontent.com/unrstuart/datamine_tacticus/170e8ff9e2e832ba7883fc6bc438431b16e780f3/gameconfig.1.44.json
       - run: python3 make_bundle.py
       - name: Browser harness selftest (bundle output == subprocess truth)
         run: python3 browser_harness.py

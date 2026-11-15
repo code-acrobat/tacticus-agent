@@ -45,7 +45,7 @@
   },
 
   "mercy": {
-    "status": "FOUND - from the raw game config (research/datamine/gameconfig142.json)",
+    "status": "FOUND - from the raw game config (research/datamine/gameconfig144.json)",
     "parameters": {
       "campaignMercyWeightAdjustment": { "success": 0, "fail": -1, "threshold": 1 }
     },
@@ -77,7 +77,7 @@
       "interval_minutes": 5,
       "per_hour": 12,
       "per_day": 288,
-      "source": "user-confirmed (5 min) + research/datamine/gameconfig142.json staminaRegenerationTime 300 / staminaRegenerationAmount 1",
+      "source": "user-confirmed (5 min) + research/datamine/gameconfig144.json staminaRegenerationTime 300 / staminaRegenerationAmount 1",
       "note": "The earlier '6 minutes / 240 per day' figure was a mix-up with the 6 energy an attack costs in a normal mission."
     },
     "extra": {
@@ -115,7 +115,7 @@
     },
     "cap": {
       "value": 60,
-      "source": "research/datamine/gameconfig142.json -> maxStamina: 60",
+      "source": "research/datamine/gameconfig144.json -> maxStamina: 60",
       "note": "So the pool holds under one full Elite node (6 x 10 = 60) exactly; regen is wasted if not spent, and a day's full regen (240-288) covers 4-5 nodes at their attempt caps."
     }
   },

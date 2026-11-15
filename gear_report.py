@@ -68,7 +68,7 @@ import sys
 from rank_up_report import MOW_IDS, load_player, rank_name, run
 
 BASE = pathlib.Path(__file__).resolve().parent
-GAMECONFIG = BASE / "research" / "datamine" / "gameconfig142.json"
+GAMECONFIG = BASE / "research" / "datamine" / "gameconfig144.json"
 SHOP_PRICES = BASE / "tacticus-shop-prices.json"
 ITEMS_FILE = (BASE / "research" / "tacticus-planner-api" / "src"
               / "TacticusPlanner.GameCatalog" / "Data" / "datamine" / "raw"

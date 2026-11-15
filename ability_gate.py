@@ -41,7 +41,7 @@ from collections import Counter
 from rank_up_report import MOW_IDS, load_player, rank_name, run
 
 BASE = pathlib.Path(__file__).resolve().parent
-GAMECONFIG = BASE / "research" / "datamine" / "gameconfig142.json"
+GAMECONFIG = BASE / "research" / "datamine" / "gameconfig144.json"
 CC = "clientGameConfig"
 
 RARITY = ("Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic")

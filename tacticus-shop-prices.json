@@ -2,7 +2,7 @@
   "schema_version": 1,
   "description": "Daily Deals / shop price reference for buy-vs-farm analysis. Two sources: the local datamine (authoritative config) and tacticus.wiki.gg (community, may lag). Conflicts are flagged. Farm-side costs come from energy_cost.py, not from this file.",
   "sources": {
-    "datamine": "research/datamine/gameconfig142.json -> $.clientGameConfig.shop",
+    "datamine": "research/datamine/gameconfig144.json -> $.clientGameConfig.shop",
     "wiki_shops": "https://tacticus.wiki.gg/wiki/Shops",
     "wiki_droprate": "https://tacticus.wiki.gg/wiki/HDTW_DropRate",
     "wiki_bsupgrades": "https://tacticus.wiki.gg/wiki/HDTW_BSUpgrades",

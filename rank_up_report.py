@@ -47,7 +47,7 @@ Heroes at their rarity rank cap are excluded too: the planner ships a grid
 for every rank of every hero, but the game refuses promotion past
 heroProgressionSteps[].maxRank for the hero's rarity (Rare 9 = Silver I,
 Epic 12 = Gold I, Legendary 17 = Diamond III). Soft requirement on
-research/datamine/gameconfig142.json - without it the filter is skipped.
+research/datamine/gameconfig144.json - without it the filter is skipped.
 
 Usage:
     python3 rank_up_report.py
@@ -73,7 +73,7 @@ import energy_cost
 BASE = pathlib.Path(__file__).resolve().parent
 DEFAULT_DATA = BASE / "tacticus-player.json"
 DEFAULT_RATES = BASE / "tacticus-drop-rates.json"
-GAMECONFIG = BASE / "research/datamine/gameconfig142.json"
+GAMECONFIG = BASE / "research/datamine/gameconfig144.json"
 
 GRID_SLOTS = 6
 TIERS = ["Stone", "Iron", "Bronze", "Silver", "Gold", "Diamond", "Adamantine"]

@@ -42,7 +42,7 @@ from collections import Counter
 from rank_up_report import GRID_SLOTS, MOW_IDS, MAX_RANK, load_player, rank_name, run
 
 BASE = pathlib.Path(__file__).resolve().parent
-GAMECONFIG = BASE / "research" / "datamine" / "gameconfig142.json"
+GAMECONFIG = BASE / "research" / "datamine" / "gameconfig144.json"
 CC = "clientGameConfig"          # the datamine nests everything under this
 
 # Statuses, in the order they are printed.

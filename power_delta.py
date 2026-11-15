@@ -46,7 +46,7 @@ import sys
 from rank_up_report import GRID_SLOTS, MOW_IDS, load_player, rank_name, run
 
 BASE = pathlib.Path(__file__).resolve().parent
-GAMECONFIG = BASE / "research" / "datamine" / "gameconfig142.json"
+GAMECONFIG = BASE / "research" / "datamine" / "gameconfig144.json"
 CC = "clientGameConfig"
 
 # Ported from the planner's combat-power.ts (AGPL-3.0, credited above).

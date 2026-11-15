@@ -2,7 +2,7 @@
 """Shard sources: where to get shards (or a full unlock) for a character.
 
 Answers "where do I get shards for X?" from the raw game config
-(research/datamine/gameconfig142.json): campaign nodes that drop them, shop
+(research/datamine/gameconfig144.json): campaign nodes that drop them, shop
 offers (incl. rotating event shops), requisition / summoning-portal odds,
 post-unlock hero quests, the webstore bundle and past release banners.
 
@@ -22,7 +22,7 @@ from pathlib import Path
 from rank_up_report import load_player, rank_name, run
 
 BASE = Path(__file__).resolve().parent
-GAMECONFIG = BASE / "research" / "datamine" / "gameconfig142.json"
+GAMECONFIG = BASE / "research" / "datamine" / "gameconfig144.json"
 CC = "clientGameConfig"
 # tacticus-shop-prices.json -> requisition.pull_1 (line 100); pulled from the
 # portal chain itself, only the price is quoted from that file.

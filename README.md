@@ -185,7 +185,7 @@ The report covers the **101 characters**. Two exclusions:
   levels instead, which use the same upgrade items but a different ladder).
   They are listed in `research/README.md`.
 * heroes at their **rarity rank cap** — `heroProgressionSteps[].maxRank` in
-  `research/datamine/gameconfig142.json` (Rare 9 = Silver I, Epic 12 = Gold I,
+  `research/datamine/gameconfig144.json` (Rare 9 = Silver I, Epic 12 = Gold I,
   Legendary 17 = Diamond III; today: Titus, Sibyll, Tan Gi'da, Sarquael,
   Ramus). The planner ships a grid for every rank of every hero, but the game
   refuses promotion past the cap until ascension, so advising it would fight
@@ -544,7 +544,7 @@ reachable; every smaller offer is power-locked below. `apply_gold` and
 **The stock is one shared pool.** Each plan assumes it gets *all* of it, so two
 plans printed together cannot both be paid from stock — the footer says so too.
 
-It needs `research/datamine/gameconfig142.json` (the XP tables exist only in the
+It needs `research/datamine/gameconfig144.json` (the XP tables exist only in the
 raw datamine — the planner has no XP data) and runs in ~0.2 s. XP is one of
 three rank-up gates: items, XP, ascension.
 
@@ -657,7 +657,7 @@ table prints them in the `Relic` column and a footer line; a hero's detail view
 flags `[RELIC, relic-slot]` on the slot that can accept one.
 
 The tool needs `research/` (planner equipment catalog for faction/relic locks)
-and `research/datamine/gameconfig142.json` (slot layout, rarity, crusade
+and `research/datamine/gameconfig144.json` (slot layout, rarity, crusade
 prices). It excludes the 11 machines of war — they have no equipment slots.
 
 ## Ability gate report
